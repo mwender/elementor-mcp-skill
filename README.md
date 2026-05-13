@@ -1,4 +1,4 @@
-# elementor-mcp
+# elementor-mcp-skill
 
 A [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) for fluent page-building on WordPress sites that use Elementor / Elementor Pro via the [Elementor MCP server](https://github.com/msrbuilds/elementor-mcp). The skill teaches Claude to build and refactor pages with **native Elementor widgets** — image, heading, text-editor, icon-box, container, button, divider, icon-list — instead of falling back to HTML widgets, so the resulting page remains fully editable from the Elementor panel UI.
 
