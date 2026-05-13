@@ -1,6 +1,23 @@
 ---
 name: elementor-mcp
-description: Use this skill whenever you are working with an Elementor or Elementor Pro WordPress site via the Elementor MCP — recognizable by `mcp__*__elementor-mcp-*` tools being available in the session, or by the user asking to create, edit, refactor, or style a page on a WordPress site that uses Elementor (often with the Hello Elementor theme). Teaches the fluent patterns for building pages with native Elementor widgets (image, heading, text-editor, icon-box, container, etc.) instead of falling back to HTML widgets; the two-step `add-*` then `update-element` pattern for getting styling into Elementor's native data model so it remains editable from the panel UI; the global kit / `__globals__` strategy for brand consistency; common traps like `content_width: "boxed"` collapsing flex layouts; the safe-svg upload-roles gate; and the agent-browser visual-review loop. Trigger even when the user doesn't say "Elementor MCP" explicitly — if Elementor MCP tools are available in the session, this skill applies to any page-building, page-editing, or page-refactoring task on that site. Also trigger when the user mentions building a landing page, sales page, one-sheet, or pitch-deck-style page on a WordPress site that uses Elementor.
+description: >-
+  Use this skill whenever you are working with an Elementor or Elementor Pro
+  WordPress site via the Elementor MCP — recognizable by `mcp__*__elementor-mcp-*`
+  tools being available in the session, or by the user asking to create, edit,
+  refactor, or style a page on a WordPress site that uses Elementor (often with
+  the Hello Elementor theme). Teaches the fluent patterns for building pages
+  with native Elementor widgets (image, heading, text-editor, icon-box, container,
+  etc.) instead of falling back to HTML widgets; the two-step `add-*` then
+  `update-element` pattern for getting styling into Elementor's native data
+  model so it remains editable from the panel UI; the global kit / `__globals__`
+  strategy for brand consistency; common traps like `content_width: "boxed"`
+  collapsing flex layouts; the safe-svg upload-roles gate; and the agent-browser
+  visual-review loop. Trigger even when the user doesn't say "Elementor MCP"
+  explicitly — if Elementor MCP tools are available in the session, this skill
+  applies to any page-building, page-editing, or page-refactoring task on that
+  site. Also trigger when the user mentions building a landing page, sales
+  page, one-sheet, or pitch-deck-style page on a WordPress site that uses
+  Elementor.
 ---
 
 # Elementor MCP — fluent page building
