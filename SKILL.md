@@ -225,13 +225,18 @@ A small set of CSS rules belongs in Kit → Site Settings → Custom CSS rather 
 
 ```css
 /* Drop trailing margin on the last paragraph of a text-editor widget — keeps
-   the widget's bottom edge flush with its container's bottom padding. */
-.elementor-widget-text-editor .elementor-widget-container > p:last-child {
+   the widget's bottom edge flush with its container's bottom padding.
+   Both selectors handle Elementor's two DOM modes: "Optimized DOM Output"
+   enabled (the default in 3.x+, no .elementor-widget-container wrapper) and
+   disabled (older sites still have the wrapper). */
+.elementor-widget-text-editor > p:last-child,
+.elementor-widget-text-editor > .elementor-widget-container > p:last-child {
   margin-bottom: 0;
 }
 
 /* Symmetric: drop leading margin on the first paragraph too. */
-.elementor-widget-text-editor .elementor-widget-container > p:first-child {
+.elementor-widget-text-editor > p:first-child,
+.elementor-widget-text-editor > .elementor-widget-container > p:first-child {
   margin-top: 0;
 }
 
@@ -243,7 +248,15 @@ A small set of CSS rules belongs in Kit → Site Settings → Custom CSS rather 
 }
 ```
 
-The `.elementor-widget-container >` direct-child combinator is important — it scopes the margin reset to top-level paragraphs in the widget, leaving nested paragraphs inside lists/blockquotes alone.
+**Why two selectors per margin rule?** Elementor has a setting called "Optimized DOM Output" (Settings → Elementor → Features). When enabled (the default on new installs), text-editor widgets render as `<div class="elementor-widget-text-editor"><p>...</p></div>` — the `<p>` is a direct child. When disabled (older sites), there's an extra wrapper: `<div class="elementor-widget-text-editor"><div class="elementor-widget-container"><p>...</p></div></div>`. The doubled selector handles both. The direct-child combinator (`>`) keeps the rule from accidentally matching paragraphs nested inside lists or blockquotes.
+
+**Verify selectors against real markup before committing them to a kit.** A quick check in agent-browser:
+
+```bash
+agent-browser eval "document.querySelectorAll('.elementor-widget-text-editor > p:last-child, .elementor-widget-text-editor > .elementor-widget-container > p:last-child').length"
+```
+
+If the count is 0 on a page that clearly has text-editor widgets, the selector is wrong. Don't write a CSS rule to a global kit without confirming it matches at least one element.
 
 ### The workflow check (step 3 of [Workflow](#workflow))
 
@@ -274,8 +287,10 @@ wp eval '
   $existing = $settings["custom_css"] ?? "";
   $baseline = "
 /* skill-baseline: applied */
-.elementor-widget-text-editor .elementor-widget-container > p:last-child { margin-bottom: 0; }
-.elementor-widget-text-editor .elementor-widget-container > p:first-child { margin-top: 0; }
+.elementor-widget-text-editor > p:last-child,
+.elementor-widget-text-editor > .elementor-widget-container > p:last-child { margin-bottom: 0; }
+.elementor-widget-text-editor > p:first-child,
+.elementor-widget-text-editor > .elementor-widget-container > p:first-child { margin-top: 0; }
 .elementor a:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 ";
   $settings["custom_css"] = trim($existing) . "\n\n" . trim($baseline) . "\n";
