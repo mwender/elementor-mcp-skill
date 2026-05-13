@@ -258,32 +258,13 @@ On your first interaction with an Elementor site, after `get-global-settings`, l
 
 **Propose and confirm, don't apply silently.** The kit is a shared resource that affects the whole site.
 
-### Applying the baseline
+### Applying the baseline — the ONLY safe path is `wp eval`
 
-You have two interchangeable paths. Both work; pick based on what's available in the session.
-
-**Path A — MCP (preferred when working in a Claude session):**
-
-Get the kit's post_id once, then update its `custom_css` like any other page setting:
-
-```bash
-wp option get elementor_active_kit
-# → e.g. 4
-```
-
-Then via MCP, passing the kit's post_id:
-
-```
-elementor-mcp-update-page-settings(post_id=<kit-id>, settings={
-  "custom_css": "<existing CSS>\n\n/* skill-baseline: applied */\n<the three rules>"
-})
-```
-
-Two caveats:
-- `elementor-mcp-get-global-settings` can return a cached snapshot. To verify a write, prefer `wp post meta get <kit-id> _elementor_page_settings` (full output, not truncated) over re-calling `get-global-settings`.
-- After writing, run `wp elementor flush_css` to regenerate Elementor's cached CSS files on disk. Without this, the new rules sit in the database but won't render on the front end.
-
-**Path B — direct WP-CLI (no MCP needed, fully reliable):**
+> ⚠️ **DO NOT use `elementor-mcp-update-page-settings` on the kit post.** This is the most dangerous trap in this entire skill. The MCP tool does a **full replace** on the kit's `_elementor_page_settings` meta, NOT a merge. If you pass `{"custom_css": "..."}` to the kit's post_id, it will replace the entire settings array with just that one key. Elementor then falls back to its global defaults for everything else — colors revert to `#6EC1E4`/`#54595F`/`#7A7A7A`/`#61CE70`, typography reverts to Roboto, every per-heading color is lost, every `__globals__` reference disappears. The site's brand identity is wiped in a single call.
+>
+> This is the opposite of `update-element` (which DOES partial-merge — that's why widget styling work is safe). The behavior diverges specifically for kit posts.
+>
+> The only safe path for kit-level changes is read-modify-write via `wp eval`. **There is no exception. Don't be tempted by the convenience of the MCP path here.**
 
 ```bash
 KIT_ID=$(wp option get elementor_active_kit)
@@ -303,7 +284,36 @@ wp eval '
 wp elementor flush_css
 ```
 
-The `skill-baseline: applied` comment is the marker future sessions look for to know the rules are in place. **Always run `wp elementor flush_css` after either path** — Elementor caches kit CSS to disk; without flushing, the rules won't render until something else triggers a regen.
+The `skill-baseline: applied` comment is the marker future sessions look for to know the rules are in place. **Always run `wp elementor flush_css` after the write** — Elementor caches kit CSS to disk; without flushing, the rules won't render until something else triggers a regen.
+
+**Why this pattern is safe:** it reads the FULL current settings array, modifies only the `custom_css` key in-memory, and writes the WHOLE array back. Every other key (`system_colors`, `system_typography`, `h1_color`, `body_color`, `__globals__`, etc.) is preserved by identity.
+
+### If the kit is already corrupted
+
+If you discover the kit has been wiped (symptoms: headlines render `rgb(122, 122, 122)`, computed `--e-global-color-text` is `#7A7A7A`, `system_colors` shows Elementor defaults like `#6EC1E4`), WordPress post revisions are your safety net. Elementor preserves kit settings in revisions:
+
+```bash
+# List revisions of the kit (active kit is usually post 4)
+wp post list --post_type=revision --post_parent=$(wp option get elementor_active_kit) \
+  --fields=ID,post_modified,post_title
+
+# Inspect a candidate revision's settings to find the last known-good one
+wp eval '
+  $rev_id = <REVISION_ID>;
+  $ps = get_post_meta($rev_id, "_elementor_page_settings", true);
+  echo "Primary: " . $ps["system_colors"][0]["color"] . PHP_EOL;
+  echo "h1_color: " . ($ps["h1_color"] ?? "MISSING") . PHP_EOL;
+'
+
+# Restore from the chosen revision (preserves the revision; non-destructive)
+wp eval '
+  $good = get_post_meta(<REVISION_ID>, "_elementor_page_settings", true);
+  update_post_meta(<KIT_ID>, "_elementor_page_settings", $good);
+'
+wp elementor flush_css
+```
+
+Always inspect a few revisions to find the most recent pre-corruption snapshot. Reapply any legitimate post-corruption changes (like the baseline CSS) on top of the restored settings.
 
 ### Opt-out
 
@@ -358,6 +368,7 @@ This preserves the parent container's styling (background, padding, layout) and 
 | Treating `add-custom-css` as primary, `update-element` as fallback | Inverse: native first, CSS only when no native control exists |
 | Giving a flex child `_flex_grow: "1"` without setting `_flex_size: "none"` on its fixed sibling | Pair them — see "Flex sizing" above. Symptom: the fixed sibling visually disappears. |
 | Creating a flex-column container without explicit `flex_align_items` | Set `flex_align_items: "stretch"` explicitly — Elementor injects `"center"` otherwise, which silently breaks any `align: "left"` on child widgets. |
+| Calling `elementor-mcp-update-page-settings` on a kit post | NEVER. It does a full replace on kit meta and wipes the entire brand kit (colors, typography, globals). Use `wp eval` read-modify-write instead — see [Applying the baseline](#applying-the-baseline--the-only-safe-path-is-wp-eval). The MCP tool is safe for regular `page`/`post` post types only. |
 
 ## Key tool reference
 
