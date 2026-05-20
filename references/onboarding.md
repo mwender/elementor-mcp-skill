@@ -180,6 +180,10 @@ After writing `.mcp.json`, the user needs to restart Claude Code so the new serv
 Once MCP tools are available in the session, verify the site is ready before any page-building:
 
 ```bash
+# 0. Permalinks configured? (virgin sites often miss this — REST API returns HTML if not set)
+wp option get permalink_structure   # should be non-empty, e.g. /%postname%/
+# If empty: wp rewrite structure '/%postname%/' && wp rewrite flush
+
 # 1. Both plugins active?
 wp plugin list --status=active | grep -E "mcp-adapter|elementor-mcp"
 
