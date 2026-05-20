@@ -45,7 +45,7 @@ test -f composer.json && grep -q '"roots/wordpress"' composer.json && echo BEDRO
 
 ## Workflow
 
-1. **Read the source artifact first.** PDF, Figma, sketch, brief — whatever's authoritative for content and design. Don't guess.
+1. **Read the source artifact first.** PDF, Figma, sketch, brief, or reference URL — whatever's authoritative for content and design. Don't guess. **If a reference URL is provided**, open it in `agent-browser` and use `snapshot` + `eval` to extract content and computed design tokens before touching Elementor. See [`references/reference-site-analysis.md`](references/reference-site-analysis.md).
 2. **Get the site's global kit.** Call `elementor-mcp-get-global-settings` before placing the first container. It returns Primary/Secondary/Accent/Text colors and H1/H2/body typography — the source of truth for brand. Use these via `__globals__` references rather than redefining colors per element, so kit edits cascade. **If this is a fresh design setup**, the system slots (Primary/Secondary/Text/Accent for both colors and typography) will still be on Elementor defaults (Roboto, `#6EC1E4`, etc.) — configure those alongside any custom presets before building. See **[`references/site-settings.md`](references/site-settings.md)** for the full two-layer setup pattern.
 3. **Check the kit's baseline CSS.** Inspect `settings.custom_css` from the global settings response. If the [kit-baseline rules](#kit-level-css-conventions) aren't present (and there's no opt-out marker), propose adding them to the user before building. This is a one-time per-site check — once the baseline is in place, you skip this step on subsequent sessions.
 4. **Narrate the layout before any build call.** Decompose into sections → containers → widgets → settings in prose. Catches design mistakes before they're 20 `add-*` calls deep, and turns the eventual implementation into a transcription rather than a design exercise.
@@ -229,14 +229,18 @@ If safe-svg isn't installed at all, recommend installing it (`wp plugin install 
 ```bash
 agent-browser set viewport 1280 800              # ALWAYS do this first
 agent-browser open https://<site>/<slug>/
-agent-browser screenshot --full /tmp/page.png
+agent-browser screenshot /tmp/page.png
 ```
 
 Then `Read` the screenshot.
 
 **The default agent-browser viewport is narrow.** Without an explicit `set viewport`, screenshots come out at mobile-width and make every flex row look broken. Always size to desktop first unless you're specifically testing the mobile breakpoint.
 
-For tighter UI loops, `agent-browser snapshot -i` gives a text outline of interactive elements with `@eN` refs that you can target with `agent-browser click @e3` etc.
+`agent-browser snapshot` gives a full semantic text outline of the page — every heading, paragraph, link text, and nav item, with `@eN` refs you can target with `agent-browser click @e3` etc. This is more useful than a screenshot for reading content.
+
+`agent-browser eval "<js>"` runs JavaScript in the live browser context and returns the result — use it to read computed styles, query DOM structure, or extract design tokens. This is the primary tool for *understanding* a reference site.
+
+**Screenshots are for visual QA of what you built. eval+snapshot are for understanding what to build.** See **[`references/reference-site-analysis.md`](references/reference-site-analysis.md)** for the full reference-site analysis workflow.
 
 After each visual-review pass, decide:
 - **Rendering glitch?** → fix the offending element via `update-element` or `update-container`.
