@@ -107,23 +107,46 @@ JSON.stringify([...colors].slice(0, 24))
 
 For any section in the `snapshot` output, target it by ref or selector:
 
+Always include the "invisible" properties — things screenshots flatten or omit entirely: `rgba` backgrounds (screenshots composite them into a solid color), thin semi-transparent borders, `backdropFilter`, and `boxShadow` with low opacity. These are systematically undetectable from screenshots but trivially captured by eval.
+
 ```bash
 # By ref from snapshot output
 agent-browser eval "
 const el = document.querySelector('[data-ref=\"e12\"]') || document.querySelectorAll('section')[2];
 const s = getComputedStyle(el);
-JSON.stringify({ bg: s.backgroundColor, padding: s.padding, font: s.fontFamily, color: s.color })
+const borders = ['Top','Right','Bottom','Left'].reduce((acc, side) => {
+    const w = s['border' + side + 'Width'];
+    if (w !== '0px') acc[side.toLowerCase()] = w + ' ' + s['border' + side + 'Style'] + ' ' + s['border' + side + 'Color'];
+    return acc;
+  }, {});
+JSON.stringify({
+  bg: s.backgroundColor,
+  padding: s.padding,
+  font: s.fontFamily,
+  color: s.color,
+  border: borders,
+  backdropFilter: s.backdropFilter,
+  boxShadow: s.boxShadow
+})
 "
 
-# By semantic selector
+# By semantic selector — full property set including invisible properties
 agent-browser eval "
 const cta = document.querySelector('section:last-of-type');
 const s = getComputedStyle(cta);
 const btn = cta.querySelector('a, button');
 const bs = btn ? getComputedStyle(btn) : null;
+const borders = ['Top','Right','Bottom','Left'].reduce((acc, side) => {
+    const w = s['border' + side + 'Width'];
+    if (w !== '0px') acc[side.toLowerCase()] = w + ' ' + s['border' + side + 'Style'] + ' ' + s['border' + side + 'Color'];
+    return acc;
+  }, {});
 JSON.stringify({
   sectionBg: s.backgroundColor,
   sectionPadding: s.padding,
+  border: borders,
+  backdropFilter: s.backdropFilter,
+  boxShadow: s.boxShadow,
   btn: bs ? { bg: bs.backgroundColor, color: bs.color, font: bs.fontFamily, size: bs.fontSize, weight: bs.fontWeight, padding: bs.padding, borderRadius: bs.borderRadius } : null
 }, null, 2)
 "
