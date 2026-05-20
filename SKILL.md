@@ -108,6 +108,26 @@ Use the table below to pick the right widget. Reach for `add-html` only when the
 
 **Decomposition principle.** When in doubt, prefer more widgets over fewer. Three native widgets (icon, title, description) in a column container beat one icon-box widget when the design needs custom styling, and beat one HTML widget almost always. Each widget is its own draggable, content-editable unit in the panel.
 
+## Container gap — use `flex_gap`, not `gap`
+
+When setting the spacing between a container's flex children, always use `flex_gap` in `update-element` calls — not `gap`. Elementor's CSS generator reads `flex_gap` to emit `--widgets-spacing-row` / `--widgets-spacing-column`. The `gap` key is accepted and stored in the element data, but it does not drive CSS output and will appear to have no effect on the frontend.
+
+```
+# Wrong — stored but ignored by CSS generator:
+update-element(element_id="<col-container>", settings={
+  "gap": {"column": "0", "row": "32", "unit": "px", "isLinked": false}
+})
+
+# Correct — Elementor panel writes this; CSS generator reads this:
+update-element(element_id="<col-container>", settings={
+  "flex_gap": {"column": "0", "row": "32", "unit": "px", "isLinked": false}
+})
+```
+
+Symptom of using the wrong key: the page still shows the kit's global default spacing (typically 20px) regardless of the value you wrote.
+
+Also add the matching anti-pattern row (below, in the Anti-patterns table).
+
 ## Container width on flex children — the boxed trap
 
 The single most common layout bug: a 3-column flex row that should sit horizontal collapses to a vertical stack.
@@ -299,6 +319,7 @@ If you lose an ID, recover it with `elementor-mcp-get-page-structure` or `elemen
 | Omitting `_title` on top-level section containers | Set `_title` at creation time (e.g. `"_title": "Hero — Section"`). Costs nothing; makes the Elementor Navigator a readable page map instead of "Container / Container / Container." Inner containers and widgets don't need it. |
 | Wrong tag name or key format for ACF dynamic tags | Use `tag_name: "acf-text"` (not `"acf"`). The `key` setting must be `"field_key:field_name"` (colon-separated, e.g. `"field_page_eyebrow:page_eyebrow"`). Passing only the field key causes a PHP warning and the field still renders, but passing only the field name silently fails. Use `list-dynamic-tags` to confirm available tag names for the active ACF version. |
 | Assuming a user-edited element's structure from memory or conversation summaries | Call `get-page-structure` + `get-element-settings` on the reference element *before* building anything meant to match it. User hands-on edits introduce nesting depth, sub-container order, and setting details that no summary fully captures. The API is ground truth; summaries are hints. |
+| Setting container row/column gap via `gap` key | Use `flex_gap` instead — Elementor's CSS generator reads `flex_gap` to emit `--widgets-spacing-row/column`. The `gap` key is stored but silently ignored for CSS output. Symptom: spacing stays at the kit default (20px) no matter what value you write. |
 
 ## Key tool reference
 
