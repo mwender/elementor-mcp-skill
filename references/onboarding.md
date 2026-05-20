@@ -71,6 +71,15 @@ wp mcp-adapter list
 
 If `wp mcp-adapter list` errors with "not a registered wp command", the plugin-level vendor/ is missing — run step 2 above.
 
+**Optional — expose credentials as WP constants (Bedrock):** If the Application Password is stored in `.env` (e.g., `WP_APP_USER` / `WP_APP_PASSWORD`), wire them up in `config/application.php` using the same `Config::define()` pattern used for DB credentials:
+
+```php
+Config::define('WP_APP_USER', env('WP_APP_USER'));
+Config::define('WP_APP_PASSWORD', env('WP_APP_PASSWORD'));
+```
+
+This makes them available as PHP constants inside WordPress, consistent with Bedrock's config conventions. It does NOT make them available in the shell environment — see the [HTTP transport note](#http-cloud-friendly-no-local-cli-needed) about why `${ENV_VAR}` interpolation doesn't work in `.mcp.json` on Bedrock.
+
 Check the [elementor-mcp README](https://github.com/msrbuilds/elementor-mcp) for the current install guidance — Packagist support may have been added since this reference was written.
 
 > **WP 6.8 note:** the MCP Adapter requires the [Abilities API](https://github.com/WordPress/abilities-api), which is in core from 6.9 onward. On 6.8 you also need to install it separately (`wp plugin install abilities-api --activate` on standard WP, `composer require wordpress/abilities-api` on Bedrock).
@@ -147,6 +156,20 @@ Cons: only works where Claude has shell + filesystem access to the WordPress ins
 ```
 
 The user generates the Application Password themselves (Users → Profile → Application Passwords). **Never generate credentials on the user's behalf** — they should be the only one to create one and hand it over.
+
+Compute the base64 value from the username and Application Password:
+
+```bash
+python3 -c "import base64; print(base64.b64encode(b'<user>:<app-password>').decode())"
+```
+
+**Hardcode the base64 value directly in `.mcp.json` — do not use `${ENV_VAR}` interpolation.** Claude Code expands `${...}` references from the shell environment. On Bedrock sites, `.env` is loaded by PHP/Dotenv when WordPress boots — it never reaches the shell Claude Code runs in. On standard WP sites the same applies: the shell environment won't have those vars unless they're explicitly exported. `${VAR}` will silently expand to an empty string, the Authorization header fails, and the MCP server won't load. Since `.mcp.json` will contain a credential, add it to `.gitignore`:
+
+```bash
+echo ".mcp.json" >> .gitignore
+```
+
+If credentials expire, recompute the base64 and update the header value in `.mcp.json`.
 
 > Default to STDIO for any local Valet / DDEV / Local-by-Flywheel site. Reach for HTTP when the site is remote, or when running in a CI/cloud agent without WP-CLI on PATH.
 
