@@ -177,6 +177,39 @@ update-container(element_id="<content-col-id>", settings={
 
 Symptom of forgetting the `"none"`: the fixed-size sibling visually disappears or becomes a sliver. If you see that, the growing partner is starving it.
 
+## Grid containers — always set both axes explicitly
+
+When creating a `container_type: "grid"` container, always pass **both** `grid_columns_grid` AND `grid_rows_grid` in the same call. If you set only the columns, Elementor infers the row count and defaults to 2 rows — leaving an empty second row that renders as extra whitespace.
+
+```
+add-container(parent_id="<parent>", settings={
+  "container_type": "grid",
+  "grid_columns_grid": "repeat(3, 1fr)",
+  "grid_rows_grid": {"unit": "fr", "size": 1, "sizes": []},   # ← always set this explicitly
+  ...
+})
+```
+
+> ⚠️ `grid_rows_grid` is an **object** (like other dimension controls), NOT a string. Its `size` field is the row count; `unit` is the track size unit. Passing a string like `"1fr"` is silently ignored and the default of 2 rows stays. `grid_columns_grid` is the exception — it accepts a full CSS string like `"repeat(3, 1fr)"`. The two controls have different formats.
+
+**Post-build verification eval:** after placing any grid container, verify both axes rendered correctly:
+
+```bash
+agent-browser eval "
+const g = document.querySelector('.elementor-element-<element_id>');
+const s = getComputedStyle(g);
+JSON.stringify({ cols: s.gridTemplateColumns, rows: s.gridTemplateRows, children: g.childElementCount })
+"
+```
+
+If `rows` shows two track sizes (`183px 183px`) instead of one, the grid has an empty extra row. Fix via:
+
+```
+update-container(post_id=<id>, element_id="<grid-id>", settings={"grid_rows_grid": "1fr"})
+```
+
+Screenshots cannot surface this issue — the empty row looks identical to section padding at any viewport width. The eval is the only reliable check.
+
 ## Column containers default to `flex_align_items: "center"` — set it explicitly
 
 A flex column container created without an explicit `flex_align_items` gets `"center"` injected by Elementor. That centers each child widget *as a block* within the column — which makes any `align: "left"` setting on a heading or text-editor inside it look like it's doing nothing. The text alignment IS being set, but the WIDGET WRAPPER is centered, so left-aligned text inside a narrow centered wrapper still appears centered on the page.
@@ -438,6 +471,7 @@ This preserves the parent container's styling (background, padding, layout) and 
 | Creating a flex-column container without explicit `flex_align_items` | Set `flex_align_items: "stretch"` explicitly — Elementor injects `"center"` otherwise, which silently breaks any `align: "left"` on child widgets. |
 | Calling `elementor-mcp-update-page-settings` on a kit post | NEVER. It does a full replace on kit meta and wipes the entire brand kit (colors, typography, globals). Use `wp eval` read-modify-write instead — see [Applying the baseline](#applying-the-baseline--the-only-safe-path-is-wp-eval). The MCP tool is safe for regular `page`/`post` post types only. |
 | Setting custom typography/colors but skipping the system slots | Set both layers. System slots (Primary/Secondary/Text/Accent) still appear in every widget's picker — if left on Elementor defaults they show Roboto/`#6EC1E4`. See [`references/site-settings.md`](references/site-settings.md). |
+| Setting `grid_columns_grid` without `grid_rows_grid` | Always set both axes when creating a grid container. Omitting `grid_rows_grid` lets Elementor default to 2 rows, leaving an empty second row. After building any grid, run the post-build eval to confirm `gridTemplateRows` — a screenshot cannot catch this. See [Grid containers](#grid-containers--always-set-both-axes-explicitly). |
 
 ## Key tool reference
 
