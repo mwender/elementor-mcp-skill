@@ -50,7 +50,7 @@ test -f composer.json && grep -q '"roots/wordpress"' composer.json && echo BEDRO
 3. **Check the kit's baseline CSS.** Inspect `settings.custom_css` from the global settings response. If the string `skill-baseline: applied` is absent (and `skill-baseline: opt-out` is also absent), propose adding the baseline rules before building. Full rules, application recipe, and opt-out flow in **[`references/kit-css.md`](references/kit-css.md)**.
 4. **Narrate the layout before any build call.** Decompose into sections → containers → widgets → settings in prose. Catches design mistakes before they're 20 `add-*` calls deep, and turns the eventual implementation into a transcription rather than a design exercise.
 5. **Create the page as draft first.** `elementor-mcp-create-page` with `status: "draft"`. Pick the right page template (see [Page template choice](#page-template-choice)).
-6. **Build sections incrementally.** Container → its children → next container. Don't try to one-shot the whole page through `build-page` — small steps make iteration cheap.
+6. **Build sections incrementally.** Container → its children → next container. Don't try to one-shot the whole page through `build-page` — small steps make iteration cheap. **Set `_title` on every top-level section container** at creation time (e.g. `"_title": "Hero — Section"`). It costs nothing — just another key in the `add-container` call — and turns the Elementor Navigator from an unlabeled "Container / Container / Container" list into a readable page map.
 7. **Publish, then visual review.** Use `agent-browser` (see [Visual review](#visual-review-with-agent-browser)). Compare against the source for both rendering glitches AND content fidelity. Iterate per-section using `update-element`, `update-container`, or `add-custom-css`.
 
 ## The two-step widget pattern
@@ -296,6 +296,7 @@ If you lose an ID, recover it with `elementor-mcp-get-page-structure` or `elemen
 | Calling `elementor-mcp-update-page-settings` on a kit post | NEVER. Full replace wipes entire brand kit. Use `wp eval` read-modify-write — see [`references/kit-css.md`](references/kit-css.md). |
 | Setting custom typography/colors but skipping the system slots | Set both layers. System slots (Primary/Secondary/Text/Accent) still appear in every widget's picker — if left on Elementor defaults they show Roboto/`#6EC1E4`. See [`references/site-settings.md`](references/site-settings.md). |
 | Setting `grid_columns_grid` without `grid_rows_grid` | Always set both axes. Omitting `grid_rows_grid` defaults to 2 rows, leaving an empty second row. Run the post-build eval to confirm — screenshots cannot catch this. See [Grid containers](#grid-containers--always-set-both-axes-explicitly). |
+| Omitting `_title` on top-level section containers | Set `_title` at creation time (e.g. `"_title": "Hero — Section"`). Costs nothing; makes the Elementor Navigator a readable page map instead of "Container / Container / Container." Inner containers and widgets don't need it. |
 
 ## Key tool reference
 
