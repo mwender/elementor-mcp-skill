@@ -136,6 +136,8 @@ The single most common layout bug: a 3-column flex row that should sit horizonta
 
 **Fix:** flex children that have explicit widths should be `content_width: "full"`. Their `width` setting (e.g. 340px) is then respected and they lay out as expected.
 
+**Important: fixing children alone is not enough if the outer wrapper is also boxed.** If the outer wrapper container is itself `content_width: "boxed"`, it constrains the entire subtree regardless of what you set on the children. When fixing the children doesn't unstick the layout, check the grandparent wrapper too — or rebuild the section from scratch as a clean top-level flex-row container with `content_width: "full"` direct children. A flat structure (one row container → N full-width children) is always more reliable than a deeply nested boxed wrapper hierarchy.
+
 ```
 add-container(parent_id="<flex-row-parent>", settings={
   "content_width": "full",            # ← critical for flex children
