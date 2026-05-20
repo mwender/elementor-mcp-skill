@@ -46,7 +46,7 @@ test -f composer.json && grep -q '"roots/wordpress"' composer.json && echo BEDRO
 ## Workflow
 
 1. **Read the source artifact first.** PDF, Figma, sketch, brief — whatever's authoritative for content and design. Don't guess.
-2. **Get the site's global kit.** Call `elementor-mcp-get-global-settings` before placing the first container. It returns Primary/Secondary/Accent/Text colors and H1/H2/body typography — the source of truth for brand. Use these via `__globals__` references rather than redefining colors per element, so kit edits cascade.
+2. **Get the site's global kit.** Call `elementor-mcp-get-global-settings` before placing the first container. It returns Primary/Secondary/Accent/Text colors and H1/H2/body typography — the source of truth for brand. Use these via `__globals__` references rather than redefining colors per element, so kit edits cascade. **If this is a fresh design setup**, the system slots (Primary/Secondary/Text/Accent for both colors and typography) will still be on Elementor defaults (Roboto, `#6EC1E4`, etc.) — configure those alongside any custom presets before building. See **[`references/site-settings.md`](references/site-settings.md)** for the full two-layer setup pattern.
 3. **Check the kit's baseline CSS.** Inspect `settings.custom_css` from the global settings response. If the [kit-baseline rules](#kit-level-css-conventions) aren't present (and there's no opt-out marker), propose adding them to the user before building. This is a one-time per-site check — once the baseline is in place, you skip this step on subsequent sessions.
 4. **Narrate the layout before any build call.** Decompose into sections → containers → widgets → settings in prose. Catches design mistakes before they're 20 `add-*` calls deep, and turns the eventual implementation into a transcription rather than a design exercise.
 5. **Create the page as draft first.** `elementor-mcp-create-page` with `status: "draft"`. Pick the right page template (see [Page template choice](#page-template-choice)).
@@ -433,6 +433,7 @@ This preserves the parent container's styling (background, padding, layout) and 
 | Giving a flex child `_flex_grow: "1"` without setting `_flex_size: "none"` on its fixed sibling | Pair them — see "Flex sizing" above. Symptom: the fixed sibling visually disappears. |
 | Creating a flex-column container without explicit `flex_align_items` | Set `flex_align_items: "stretch"` explicitly — Elementor injects `"center"` otherwise, which silently breaks any `align: "left"` on child widgets. |
 | Calling `elementor-mcp-update-page-settings` on a kit post | NEVER. It does a full replace on kit meta and wipes the entire brand kit (colors, typography, globals). Use `wp eval` read-modify-write instead — see [Applying the baseline](#applying-the-baseline--the-only-safe-path-is-wp-eval). The MCP tool is safe for regular `page`/`post` post types only. |
+| Setting custom typography/colors but skipping the system slots | Set both layers. System slots (Primary/Secondary/Text/Accent) still appear in every widget's picker — if left on Elementor defaults they show Roboto/`#6EC1E4`. See [`references/site-settings.md`](references/site-settings.md). |
 
 ## Key tool reference
 
