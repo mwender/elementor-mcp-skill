@@ -126,7 +126,23 @@ update-element(element_id="<col-container>", settings={
 
 Symptom of using the wrong key: the page still shows the kit's global default spacing (typically 20px) regardless of the value you wrote.
 
-Also add the matching anti-pattern row (below, in the Anti-patterns table).
+## Container padding — use `padding`, not `_padding`
+
+The same silent-store problem applies to container padding. Use the `padding` key (no underscore) — it generates the `--padding-top/bottom/left/right` CSS custom properties that the container's stylesheet actually reads. `_padding` is accepted and stored in the element data, but is **silently ignored** for rendered output.
+
+```
+# Wrong — stored but never rendered:
+update-element(element_id="<container>", settings={
+  "_padding": {"top": "56", "right": "88", "bottom": "32", "left": "88", "unit": "px", "isLinked": false}
+})
+
+# Correct — generates --padding-top etc. CSS vars:
+update-element(element_id="<container>", settings={
+  "padding": {"top": "56", "right": "88", "bottom": "32", "left": "88", "unit": "px", "isLinked": false}
+})
+```
+
+Symptom: container padding appears stuck at ~10px (Elementor's default) regardless of what value you write.
 
 ## Container width on flex children — the boxed trap
 
@@ -233,6 +249,61 @@ If a styling decision can plausibly be expressed via `title_color`, `text_color`
 
 **`replace: true`** on `add-custom-css` overwrites the element's existing CSS block (defaults to append). Use it when shrinking a CSS block after moving styles to native controls.
 
+## Dynamic tags — outputting live data
+
+Use `elementor-mcp-set-dynamic-tag` whenever a widget field should output a computed or context-aware value rather than hardcoded text. This keeps content editable from the panel and avoids manual updates when data changes.
+
+```
+set-dynamic-tag(post_id=<id>, element_id="<widget>",
+  setting_key="<field>",   # e.g. "title", "url", "image"
+  tag_name="<tag>",        # e.g. "current-date-time", "post-title", "site-title", "acf-text"
+  tag_settings={...}       # tag-specific options
+)
+```
+
+### Copyright year — sitewide footer or any page footer
+
+Use a `heading` widget with `header_size: "div"` (no semantic heading tag) and the `current-date-time` dynamic tag. The year auto-updates every year with zero maintenance, and all surrounding text stays panel-editable.
+
+```
+# Step 1 — add the heading
+add-heading(post_id=<id>, parent_id="<footer-container>",
+  title="placeholder",
+  header_size="div",
+  align="center"
+)
+→ element_id "abc1234"
+
+# Step 2 — style and set dynamic tag (run in parallel)
+update-element(post_id=<id>, element_id="abc1234", settings={
+  "typography_typography": "custom",
+  "typography_font_family": "Inter",
+  "typography_font_size": {"unit": "px", "size": 11, "sizes": []},
+  "typography_text_transform": "uppercase",
+  "typography_letter_spacing": {"unit": "em", "size": 0.14, "sizes": []},
+  "title_color": "rgba(255,255,255,0.2)"
+})
+
+set-dynamic-tag(post_id=<id>, element_id="abc1234",
+  setting_key="title",
+  tag_name="current-date-time",
+  tag_settings={
+    "date_format": "custom",
+    "custom_format": "Y",
+    "before": "© ",
+    "after": " [Site Name]. All rights reserved."
+  }
+)
+```
+
+Output: **© 2025 [Site Name]. All rights reserved.**
+
+Replace `[Site Name]` with the actual site name. The `before`/`after` fields wrap the dynamic year output with plain text; HTML entities like `&copy;` also work.
+
+### ACF field output
+
+See the ACF dynamic tag anti-pattern row below for the correct `tag_name` (`"acf-text"`) and `key` format (`"field_key:field_name"`).
+
 ## Kit-level CSS — safety rule and baseline check
 
 > ⚠️ **NEVER call `elementor-mcp-update-page-settings` on the kit post.** It does a **full replace** on the kit's `_elementor_page_settings` meta — colors, typography, globals, all wiped. The only safe path for any kit write is `wp eval` read-modify-write. **No exception.**
@@ -285,6 +356,34 @@ The **selector-match check** is the most important — never write a CSS rule to
 
 Set via `elementor-mcp-update-page-settings` after page creation. Use canvas for one-sheets, pitch decks, sales pages; default for content/blog pages.
 
+## Maintenance Mode / Coming Soon page
+
+Elementor Pro's Maintenance Mode intercepts all front-end requests and serves a single template. This is **not** a regular WordPress page — it's an `elementor_library` post.
+
+**Full setup reference:** [`references/maintenance-mode.md`](references/maintenance-mode.md)
+
+### Key facts
+
+**Wrong tool:** `elementor-mcp-create-page` → creates a `page` post type; won't appear in Elementor's template picker and causes PHP warnings in the maintenance mode render.
+
+**Right tool:** `elementor-mcp-create-theme-template` with `template_type: "page"`. After creation:
+```bash
+wp post meta update <id> _wp_page_template elementor_canvas
+wp post meta update <id> _elementor_edit_mode builder
+wp post update <id> --post_status=publish
+```
+
+**Activate maintenance mode** via three WP options:
+```bash
+wp option update elementor_maintenance_mode_mode        'coming_soon'   # or 'maintenance' for 503
+wp option update elementor_maintenance_mode_template_id '<post_id>'
+wp option update elementor_maintenance_mode_exclude_mode 'logged_in'    # logged-in users see the real site
+```
+
+**Deactivate** (without losing settings): `wp option update elementor_maintenance_mode_mode ''`
+
+For the footer copyright line on the maintenance page, use the `current-date-time` dynamic tag — see [Dynamic tags — outputting live data](#dynamic-tags--outputting-live-data).
+
 ## Element ID tracking
 
 Every `add-*` call returns an element_id (7-character random string). You'll need these for `update-element`, `add-custom-css`, `remove-element`, `find-element`. They're easy to lose track of — keep a running map:
@@ -322,14 +421,19 @@ If you lose an ID, recover it with `elementor-mcp-get-page-structure` or `elemen
 | Wrong tag name or key format for ACF dynamic tags | Use `tag_name: "acf-text"` (not `"acf"`). The `key` setting must be `"field_key:field_name"` (colon-separated, e.g. `"field_page_eyebrow:page_eyebrow"`). Passing only the field key causes a PHP warning and the field still renders, but passing only the field name silently fails. Use `list-dynamic-tags` to confirm available tag names for the active ACF version. |
 | Assuming a user-edited element's structure from memory or conversation summaries | Call `get-page-structure` + `get-element-settings` on the reference element *before* building anything meant to match it. User hands-on edits introduce nesting depth, sub-container order, and setting details that no summary fully captures. The API is ground truth; summaries are hints. |
 | Setting container row/column gap via `gap` key | Use `flex_gap` instead — Elementor's CSS generator reads `flex_gap` to emit `--widgets-spacing-row/column`. The `gap` key is stored but silently ignored for CSS output. Symptom: spacing stays at the kit default (20px) no matter what value you write. |
+| Using `_padding` to set container padding | Use `padding` (no underscore). `_padding` is stored but silently ignored for rendered output — the container needs `--padding-top/bottom/left/right` CSS vars which only `padding` generates. See [Container padding](#container-padding--use-padding-not-_padding). |
+| Using an HTML widget for the copyright year line | Use a `heading` widget (tag `div`) with the `current-date-time` dynamic tag. Year auto-updates; text stays panel-editable. See [Dynamic tags](#dynamic-tags--outputting-live-data). |
+| Creating a Maintenance Mode template with `elementor-mcp-create-page` | Use `elementor-mcp-create-theme-template` — the template must be `post_type: elementor_library`. A regular `page` won't appear in Elementor's Maintenance Mode picker. See [`references/maintenance-mode.md`](references/maintenance-mode.md). |
 
 ## Key tool reference
 
 | Purpose | Tool |
 |---|---|
 | Read brand kit | `elementor-mcp-get-global-settings` |
-| Create page | `elementor-mcp-create-page` |
+| Create standard page | `elementor-mcp-create-page` |
+| Create Elementor library template (maintenance mode, theme parts) | `elementor-mcp-create-theme-template` |
 | Set page template / page-level options | `elementor-mcp-update-page-settings` |
+| Assign a dynamic tag to a widget field | `elementor-mcp-set-dynamic-tag` |
 | Add container | `elementor-mcp-add-container` |
 | Update container | `elementor-mcp-update-container` |
 | Get widget's accepted schema | `elementor-mcp-get-widget-schema` |
