@@ -265,3 +265,95 @@ Deliver via `elementor-mcp-add-custom-js` appended to the root page container (p
 | `field_type` | `"text"` | Bypasses tel character-set validation |
 | `inputmode` (via JS) | `"tel"` | Restores numeric keyboard on mobile |
 | Selector | `#form-field-{custom_id}` | Set from `custom_id`, survives field type change |
+
+## Elementor form webhook payload format
+
+When an Elementor Pro form action is set to **Webhook**, the outbound request is:
+
+- **Method:** POST
+- **Content-Type:** `application/x-www-form-urlencoded`
+- **Keys:** field **labels** — not `custom_id` values
+
+PHP's `parse_str()` converts spaces in URL-encoded keys to underscores. A field labelled "Work Email" becomes the key `Work_Email`; "How can we help?" becomes `How_can_we_help?`.
+
+Elementor always appends two extra params regardless of form fields:
+
+| Key | Value |
+|---|---|
+| `form_id` | Elementor element ID of the form widget (e.g. `3b7845c`) |
+| `form_name` | The form's `form_name` setting string (e.g. `TVIQ Select Demo Request`) |
+
+### WP REST API endpoint — use label-derived keys, not custom_id
+
+A WP REST API endpoint receiving this webhook must register its `args` using the label-derived key names — not the `custom_id` values you set in the Elementor editor. The REST API validates required args **before** the callback runs, so a mismatch between the registered arg names and the incoming keys results in a silent 400 (no callback runs, no debug log entries).
+
+```php
+// ✓ Correct — matches what Elementor actually sends
+register_rest_route('mysite/v1', '/form-endpoint', [
+    'methods'             => 'POST',
+    'callback'            => 'my_form_handler',
+    'permission_callback' => '__return_true',
+    'args'                => [
+        'First_Name' => ['required' => true,  'sanitize_callback' => 'sanitize_text_field'],
+        'Last_Name'  => ['required' => true,  'sanitize_callback' => 'sanitize_text_field'],
+        'Work_Email' => ['required' => true,  'sanitize_callback' => 'sanitize_email',
+                         'validate_callback' => 'is_email'],
+        'Phone'      => ['required' => false, 'sanitize_callback' => 'sanitize_text_field'],
+        // Note: question marks are preserved through parse_str
+        'How_can_we_help?' => ['required' => false, 'sanitize_callback' => 'sanitize_textarea_field'],
+    ],
+]);
+
+// ✗ Wrong — these are custom_id values, not label-derived keys
+// Elementor never sends 'first_name', 'email', 'message' etc.
+'args' => [
+    'first_name' => [...],
+    'email'      => [...],
+    'message'    => [...],
+],
+```
+
+### Debugging a webhook 400 — the REST validation trap
+
+If the form shows "Webhook error" and the debug log is empty, the 400 is being returned by WP REST validation before your callback runs. Your callback's `error_log()` calls are never reached.
+
+To diagnose, add a `rest_pre_dispatch` filter temporarily and log the raw request body:
+
+```php
+add_filter('rest_pre_dispatch', function ($result, $server, $request) {
+    if (strpos($request->get_route(), '/your-endpoint') !== false) {
+        error_log('[DEBUG] route=' . $request->get_route());
+        error_log('[DEBUG] body=' . file_get_contents('php://input'));
+        error_log('[DEBUG] params=' . wp_json_encode($request->get_params()));
+    }
+    return $result;
+}, 10, 3);
+```
+
+This fires before validation and reveals the exact keys Elementor is sending. Remove after diagnosis.
+
+### Loopback SSL on Valet local dev
+
+Elementor's Webhook action fires via `wp_remote_post()` — a PHP HTTP request from WordPress back to itself. On Valet local development sites, this loopback request fails with a cURL SSL error because Valet's mkcert-generated CA is not in cURL's own cert store (cURL does not use the macOS system trust store).
+
+Fix with an mu-plugin that adds the filters only in development:
+
+```php
+<?php
+// web/app/mu-plugins/tviq-local-dev.php
+if (!defined('WP_ENV') || WP_ENV !== 'development') {
+    return;
+}
+add_filter('https_local_ssl_verify', '__return_false');
+add_filter('https_ssl_verify',       '__return_false');
+```
+
+Both filters are needed: `https_local_ssl_verify` covers loopback requests to the same host; `https_ssl_verify` covers all outbound WP HTTP requests. Do NOT add these filters in `config/environments/development.php` — that file loads before WordPress bootstrap and `add_filter()` is not yet defined.
+
+## JS widget — Navigator naming and placement
+
+When delivering a JS masking/interaction script via an HTML widget (or `add-custom-js`):
+
+1. **Name the widget in the Elementor Navigator.** Give it a descriptive label like "Phone Mask Script" so future editors know what it does without opening it. Set `_title` in `add-html`/`add-container` at creation time, or update it via `update-element`.
+
+2. **Place the widget adjacent to the element it interacts with.** A phone mask widget belongs next to — or inside the same section as — the form it targets. A script widget floating at the root page level is invisible in the Navigator's hierarchy and easily orphaned when the section is moved or duplicated. Proximity makes the dependency obvious.
