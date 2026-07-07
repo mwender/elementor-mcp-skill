@@ -3,7 +3,8 @@ name: elementor-mcp
 description: >-
   Use this skill whenever you are working with an Elementor or Elementor Pro
   WordPress site via the Elementor MCP — recognizable by `mcp__*__elementor-mcp-*`
-  tools being available in the session, or by the user asking to create, edit,
+  or `mcp__*__emcp-tools-*` tools being available in the session (the plugin was
+  renamed EMCP Tools in v3.0), or by the user asking to create, edit,
   refactor, or style a page on a WordPress site that uses Elementor (often with
   the Hello Elementor theme). Teaches the fluent patterns for building pages
   with native Elementor widgets (image, heading, text-editor, icon-box, container,
@@ -23,6 +24,15 @@ description: >-
 # Elementor MCP — fluent page building
 
 Most pain when building Elementor pages via MCP comes from one mistake: dropping into HTML widgets the moment a styling argument is rejected by an `add-*` tool. The widgets accept much more than their strict `add-*` validators expose. The patterns below let you build pages that are visually faithful AND remain fully editable from the Elementor panel UI — which is the whole point of using Elementor.
+
+## Version note — plugin renamed to EMCP Tools in v3.0 (read first)
+
+Check which tool prefix is live in this session before using any tool name from this document:
+
+- **`mcp__*__emcp-tools-*` prefix → plugin v3.0+.** Every `elementor-mcp-<tool>` name in this document maps to `emcp-tools-<tool>` — the workhorse tools (`update-element`, `add-container`, `update-container`, `add-custom-css`, `create-page`, `create-theme-template`, `set-dynamic-tag`, `get-global-settings`, `get-page-structure`, `get-element-settings`, `find-element`, `upload-svg-icon`, etc.) survive unchanged apart from the prefix. **Exception: the per-widget `add-*` tools (`add-heading`, `add-image`, `add-button`, …) no longer exist in v3.** Use the catalog flow instead: `list-widgets` → `get-widget-schema` → `add-free-widget` or `add-pro-widget` with a `widget_type` param — then `update-element` for styling exactly as documented below. Note also that since v3.0 the plugin works without Elementor, so EMCP tools being present no longer proves Elementor is active — confirm (`wp plugin list`) before applying these patterns.
+- **`mcp__*__elementor-mcp-*` prefix → plugin pre-3.0 (legacy).** All names in this document work as written, but recommend the user update to the current release (in-dashboard updater since v3.1, or the GitHub release zip / `wp plugin update`). After updating, **every AI client must reconnect**: the server route changed from `/wp-json/mcp/elementor-mcp-server` to `/wp-json/mcp/emcp-tools-server` (WP-CLI `--server=emcp-tools-server`) — regenerate `.mcp.json` from the EMCP Tools → Connection tab and restart the session.
+
+The Elementor settings-model knowledge in this document (setting keys, flex traps, kit safety, dynamic tags) is plugin-version-independent. The patterns were battle-tested against plugin v1.x–2.x; where a v3 tool's behavior diverges from what's described here, trust the live schema (`get-widget-schema`, `get-container-schema`) over this document — and flag the divergence so the skill can be updated.
 
 ## Onboarding a new Elementor site
 
