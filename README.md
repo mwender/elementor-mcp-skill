@@ -1,8 +1,8 @@
 # elementor-mcp-skill
 
-A [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) for fluent page-building on WordPress sites that use Elementor / Elementor Pro via the [Elementor MCP server](https://github.com/msrbuilds/elementor-mcp). The skill teaches Claude to build and refactor pages with **native Elementor widgets** — image, heading, text-editor, icon-box, container, button, divider, icon-list — instead of falling back to HTML widgets, so the resulting page remains fully editable from the Elementor panel UI.
+A [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) for fluent page-building on WordPress sites that use Elementor / Elementor Pro via [EMCP Tools](https://github.com/msrbuilds/elementor-mcp) (the MCP plugin formerly named "Elementor MCP"). The skill teaches Claude to build and refactor pages with **native Elementor widgets** — image, heading, text-editor, icon-box, container, button, divider, icon-list — instead of falling back to HTML widgets, so the resulting page remains fully editable from the Elementor panel UI.
 
-The skill auto-triggers in any Claude Code session where `mcp__*__elementor-mcp-*` tools are available, or when the user mentions building or editing pages on a WordPress site that uses Elementor.
+The skill targets EMCP Tools v3+ (`mcp__*__emcp-tools-*` tools) and auto-triggers when those — or the legacy `mcp__*__elementor-mcp-*` tools (pre-3.0, with a documented detect-and-upgrade path) — are available in a session, or when the user mentions building or editing pages on a WordPress site that uses Elementor.
 
 ## Who it's for
 
@@ -16,7 +16,8 @@ If your WordPress stack is Gutenberg/blocks or a fully custom theme without Elem
 
 Pulled from the skill's main sections — full detail in [`SKILL.md`](SKILL.md):
 
-- **The two-step widget pattern** — `add-*` for content, `update-element` for styling, so all styling decisions land in Elementor's native data model and stay editable from the Style tab
+- **The catalog widget flow (v3)** — `list-widgets` → `get-widget-schema` → `add-free-widget` with content and styling in one call, then `update-element`/`batch-update` for iteration, so all styling decisions land in Elementor's native data model and stay editable from the Style tab (legacy pre-3.0 plugins use the two-step `add-*` + `update-element` pattern, also documented)
+- **The v3 tool gate** — 39 abilities ship disabled by default in v3.1, including six the skill relies on (`add-custom-css`, `set-dynamic-tag`, `add-pro-widget`, …); the skill documents the check and the enable flow
 - **Native widget mapping** — which built-in widget corresponds to which design pattern, and when HTML widgets are actually appropriate (rarely)
 - **Common flex traps** — `content_width: "boxed"` collapsing flex layouts, `_flex_grow` siblings starving the badge, column containers defaulting to `flex_align_items: "center"` and silently centering text
 - **Image-as-badge** — turning the image widget itself into a circular gradient icon, no wrapper container required
@@ -49,13 +50,16 @@ Claude Code skills use a three-tier loading model. This skill is structured to m
 
 ```
 elementor-mcp/
-├── SKILL.md              # ~440 lines — core patterns, loaded into context when the skill triggers
-└── references/
-    ├── onboarding.md     # loaded on-demand for new-site setup (install paths, .mcp.json, memory templates)
-    └── diagnostics.md    # loaded on-demand for visual-debugging recipes
+├── SKILL.md              # ~550 lines — core patterns, loaded into context when the skill triggers
+└── references/           # loaded on-demand, one Read call away
+    ├── onboarding.md     # new-site setup (install, .mcp.json, tool gate, memory templates)
+    ├── diagnostics.md    # visual-debugging eval recipes
+    ├── kit-css.md        # kit baseline CSS + safe kit-write paths + corruption recovery
+    ├── form-widget.md    # Pro form widget styling, webhooks, phone masking
+    ├── layout-patterns.md, maintenance-mode.md, reference-site-analysis.md, site-settings.md
 ```
 
-`SKILL.md` stays under the recommended 500-line target by extracting one-time-use content (onboarding, diagnostics) into `references/`. Claude reads those reference files only when `SKILL.md` explicitly links to them, so per-session token cost stays small while the full detail is one Read tool call away when needed.
+`SKILL.md` stays lean by extracting deep-dive content into `references/`. Claude reads those reference files only when `SKILL.md` explicitly links to them, so per-session token cost stays small while the full detail is one Read tool call away when needed.
 
 ## Background
 
@@ -70,7 +74,7 @@ Issues and PRs welcome. The most valuable contributions are real-world traps and
 - Verified plugin install flow on Bedrock (documented but not yet battle-tested in a Claude session)
 - Patterns for Elementor Theme Builder templates (header / footer / single / archive / loop-item) — the skill currently covers page builds only
 - Additional kit-baseline CSS rules with broad applicability across Elementor sites
-- Edge cases in the two-step `add` / `update-element` pattern for widget types not yet exercised
+- Edge cases in the catalog flow (`add-free-widget` / `update-element`) for widget types not yet exercised
 
 If you hit something the skill should have caught and didn't, that's a high-priority issue. The skill's working principle: each documented trap is one a previous session walked into so future sessions don't have to.
 

@@ -2,46 +2,71 @@
 name: elementor-mcp
 description: >-
   Use this skill whenever you are working with an Elementor or Elementor Pro
-  WordPress site via the Elementor MCP — recognizable by `mcp__*__elementor-mcp-*`
-  or `mcp__*__emcp-tools-*` tools being available in the session (the plugin was
-  renamed EMCP Tools in v3.0), or by the user asking to create, edit,
-  refactor, or style a page on a WordPress site that uses Elementor (often with
-  the Hello Elementor theme). Teaches the fluent patterns for building pages
-  with native Elementor widgets (image, heading, text-editor, icon-box, container,
-  etc.) instead of falling back to HTML widgets; the two-step `add-*` then
-  `update-element` pattern for getting styling into Elementor's native data
-  model so it remains editable from the panel UI; the global kit / `__globals__`
-  strategy for brand consistency; common traps like `content_width: "boxed"`
-  collapsing flex layouts; the safe-svg upload-roles gate; and the agent-browser
-  visual-review loop. Trigger even when the user doesn't say "Elementor MCP"
-  explicitly — if Elementor MCP tools are available in the session, this skill
-  applies to any page-building, page-editing, or page-refactoring task on that
-  site. Also trigger when the user mentions building a landing page, sales
-  page, one-sheet, or pitch-deck-style page on a WordPress site that uses
-  Elementor.
+  WordPress site via EMCP Tools (formerly "Elementor MCP") — recognizable by
+  `mcp__*__emcp-tools-*` tools (plugin v3+) or legacy `mcp__*__elementor-mcp-*`
+  tools (pre-3.0) being available in the session, or by the user asking to
+  create, edit, refactor, or style a page on a WordPress site that uses
+  Elementor (often with the Hello Elementor theme). Teaches the fluent patterns
+  for building pages with native Elementor widgets via the catalog flow
+  (`list-widgets` → `get-widget-schema` → `add-free-widget`) instead of falling
+  back to HTML widgets; schema-first styling via `update-element` and
+  `batch-update` so styling lands in Elementor's native data model and remains
+  editable from the panel UI; the v3 disabled-by-default tool gate; the global
+  kit / `__globals__` strategy for brand consistency; common traps like
+  `content_width: "boxed"` collapsing flex layouts; the safe-svg upload-roles
+  gate; and the agent-browser visual-review loop. Trigger even when the user
+  doesn't say "EMCP" or "Elementor MCP" explicitly — if EMCP tools are
+  available in the session, this skill applies to any page-building,
+  page-editing, or page-refactoring task on that site. Also trigger when the
+  user mentions building a landing page, sales page, one-sheet, or
+  pitch-deck-style page on a WordPress site that uses Elementor.
 ---
 
 # Elementor MCP — fluent page building
 
-Most pain when building Elementor pages via MCP comes from one mistake: dropping into HTML widgets the moment a styling argument is rejected by an `add-*` tool. The widgets accept much more than their strict `add-*` validators expose. The patterns below let you build pages that are visually faithful AND remain fully editable from the Elementor panel UI — which is the whole point of using Elementor.
+Most pain when building Elementor pages via MCP comes from two mistakes: dropping into HTML widgets the moment something doesn't style as expected, and guessing setting keys — Elementor silently stores any key you write and silently ignores the wrong ones. The patterns below let you build pages that are visually faithful AND remain fully editable from the Elementor panel UI — which is the whole point of using Elementor.
 
-## Version note — plugin renamed to EMCP Tools in v3.0 (read first)
+## Plugin versions — this document targets EMCP Tools v3+
 
-Check which tool prefix is live in this session before using any tool name from this document:
+Tool names below use the v3 prefix (`emcp-tools-<tool>`, shortened to bare tool names in prose). Check which prefix is live in the session:
 
-- **`mcp__*__emcp-tools-*` prefix → plugin v3.0+.** Every `elementor-mcp-<tool>` name in this document maps to `emcp-tools-<tool>` — the workhorse tools (`update-element`, `add-container`, `update-container`, `add-custom-css`, `create-page`, `create-theme-template`, `set-dynamic-tag`, `get-global-settings`, `get-page-structure`, `get-element-settings`, `find-element`, `upload-svg-icon`, etc.) survive unchanged apart from the prefix. **Exception: the per-widget `add-*` tools (`add-heading`, `add-image`, `add-button`, …) no longer exist in v3.** Use the catalog flow instead: `list-widgets` → `get-widget-schema` → `add-free-widget` or `add-pro-widget` with a `widget_type` param — then `update-element` for styling exactly as documented below. Note also that since v3.0 the plugin works without Elementor, so EMCP tools being present no longer proves Elementor is active — confirm (`wp plugin list`) before applying these patterns.
-- **`mcp__*__elementor-mcp-*` prefix → plugin pre-3.0 (legacy).** All names in this document work as written, but recommend the user update to the current release (in-dashboard updater since v3.1, or the GitHub release zip / `wp plugin update`). After updating, **every AI client must reconnect**: the server route changed from `/wp-json/mcp/elementor-mcp-server` to `/wp-json/mcp/emcp-tools-server` (WP-CLI `--server=emcp-tools-server`) — regenerate `.mcp.json` from the EMCP Tools → Connection tab and restart the session.
+- **`mcp__*__emcp-tools-*`** → plugin v3.0+; everything below applies as written. Since v3.0 the plugin also works without Elementor, so EMCP tools being present doesn't prove Elementor is active — confirm with `wp plugin list` before applying these patterns.
+- **`mcp__*__elementor-mcp-*`** → legacy plugin (pre-3.0). Recommend updating to current (in-dashboard updater since v3.1, GitHub release zip, or `wp plugin update`). After updating, **every AI client must reconnect** — the server route changed from `/wp-json/mcp/elementor-mcp-server` to `/wp-json/mcp/emcp-tools-server` (WP-CLI `--server=emcp-tools-server`); regenerate `.mcp.json` from EMCP Tools → Connection and restart the session. If you must build on a legacy session, three deltas apply:
+  1. The tool prefix is `elementor-mcp-<tool>`, and no tools are gated off by default.
+  2. Widgets are added with per-widget tools (`add-heading`, `add-image`, …) whose validators **reject styling args** — content goes in the `add-*` call, styling in a follow-up `update-element` (the legacy "two-step pattern"). In v3 this split is unnecessary.
+  3. `create-page` does not set `_elementor_edit_mode` — run `wp post meta update <id> _elementor_edit_mode builder` after creating any page you intend to build with Elementor, or the page renders with the block editor and your content is invisible.
 
-The Elementor settings-model knowledge in this document (setting keys, flex traps, kit safety, dynamic tags) is plugin-version-independent. The patterns were battle-tested against plugin v1.x–2.x; where a v3 tool's behavior diverges from what's described here, trust the live schema (`get-widget-schema`, `get-container-schema`) over this document — and flag the divergence so the skill can be updated.
+The Elementor settings-model knowledge below (setting keys, flex traps, kit safety, dynamic tags) is plugin-version-independent. Where a live tool's behavior diverges from this document, trust the live schema (`get-widget-schema`, `get-container-schema`) — and flag the divergence so the skill can be updated.
+
+## The v3 tool gate — 39 tools ship disabled by default
+
+v3.1 disables 39 abilities out of the box (stored in the `emcp_tools_disabled_tools` wp option) — including six this skill relies on: **`add-custom-css`, `set-dynamic-tag`, `list-dynamic-tags`, `add-pro-widget`, `create-theme-template`, `set-template-conditions`**. A disabled tool is simply absent from the session's tool list — no error, no hint. Before concluding a capability doesn't exist, check the gate:
+
+```bash
+wp option get emcp_tools_disabled_tools --format=json
+```
+
+Enable tools from the EMCP Tools settings screen in wp-admin, or via read-modify-write on the option (takes effect immediately — reconnect the MCP server if the session's tool list doesn't refresh):
+
+```bash
+wp eval '
+  $d = get_option("emcp_tools_disabled_tools", []);
+  $enable = ["emcp-tools/add-custom-css","emcp-tools/set-dynamic-tag","emcp-tools/list-dynamic-tags",
+             "emcp-tools/add-pro-widget","emcp-tools/create-theme-template","emcp-tools/set-template-conditions"];
+  update_option("emcp_tools_disabled_tools", array_values(array_diff($d, $enable)));
+'
+```
+
+Propose-and-confirm before enabling anything beyond those six — the same list gates genuinely destructive tools (file writes, DB writes, plugin/theme/user management) that should stay off unless the user explicitly wants them.
 
 ## Onboarding a new Elementor site
 
-If `mcp__*__elementor-mcp-*` tools are already available in this session, the site is wired up — skip to [Workflow](#workflow).
+If EMCP tools (`mcp__*__emcp-tools-*`, or legacy `mcp__*__elementor-mcp-*`) are already available in this session, the site is wired up — skip to [Workflow](#workflow).
 
 If they're not, the user is starting fresh and you need to get the MCP plumbing in place. **See [`references/onboarding.md`](references/onboarding.md)** for the full flow:
 
 - **Detect framework** (Standard WP vs Bedrock) — install paths differ
-- **Install both MCP plugins** — `wordpress/mcp-adapter` foundation + `msrbuilds/elementor-mcp` for page-building tools. Standard WP path (wp-cli + zip from GitHub Releases) and Bedrock path (Composer + VCS repo) both documented
+- **Install the EMCP Tools plugin** — single plugin; it bundles the WordPress MCP Adapter (since v1.7.4). Standard WP and Bedrock paths both documented
 - **Verify servers registered** with `wp mcp-adapter list`
 - **Write `.mcp.json`** — STDIO template (preferred for local sites) and HTTP template (for cloud/remote)
 - **First-session checklist** — plugins active, safe-svg role-gate open, kit ID identified, agent-browser viewport sized
@@ -56,32 +81,27 @@ test -f composer.json && grep -q '"roots/wordpress"' composer.json && echo BEDRO
 ## Workflow
 
 1. **Read the source artifact first.** PDF, Figma, sketch, brief, or reference URL — whatever's authoritative for content and design. Don't guess. **If a reference URL is provided, you MUST open it in `agent-browser` and use `snapshot` + `eval` to extract exact content and computed design tokens before touching Elementor.** Screenshots are for visual QA only — `eval` + `getComputedStyle` gives exact values (colors, font sizes, weights, letter-spacing) while screenshots give "looks dark navy-ish." See [`references/reference-site-analysis.md`](references/reference-site-analysis.md).
-2. **Get the site's global kit.** Call `elementor-mcp-get-global-settings` before placing the first container. It returns Primary/Secondary/Accent/Text colors and H1/H2/body typography — the source of truth for brand. Use these via `__globals__` references rather than redefining colors per element, so kit edits cascade. **If this is a fresh design setup**, the system slots (Primary/Secondary/Text/Accent for both colors and typography) will still be on Elementor defaults (Roboto, `#6EC1E4`, etc.) — configure those alongside any custom presets before building. See **[`references/site-settings.md`](references/site-settings.md)** for the full two-layer setup pattern.
-3. **Check the kit's baseline CSS.** Inspect `settings.custom_css` from the global settings response. If the string `skill-baseline: applied` is absent (and `skill-baseline: opt-out` is also absent), propose adding the baseline rules before building. Full rules, application recipe, and opt-out flow in **[`references/kit-css.md`](references/kit-css.md)**.
+2. **Get the site's global kit.** Call `emcp-tools-get-global-settings` before placing the first container. It returns Primary/Secondary/Accent/Text colors and H1/H2/body typography — the source of truth for brand. Use these via `__globals__` references rather than redefining colors per element, so kit edits cascade. **If this is a fresh design setup**, the system slots (Primary/Secondary/Text/Accent for both colors and typography) will still be on Elementor defaults (Roboto, `#6EC1E4`, etc.) — configure those alongside any custom presets before building. See **[`references/site-settings.md`](references/site-settings.md)** for the full two-layer setup pattern.
+3. **Check the kit's baseline CSS.** Inspect `settings.custom_css` from the global settings response — the key may be absent entirely on a fresh kit; treat absent the same as no marker. If the string `skill-baseline: applied` is absent (and `skill-baseline: opt-out` is also absent), propose adding the baseline rules before building. Full rules, application recipe, and opt-out flow in **[`references/kit-css.md`](references/kit-css.md)**.
 4. **Narrate the layout before any build call.** Decompose into sections → containers → widgets → settings in prose. Catches design mistakes before they're 20 `add-*` calls deep, and turns the eventual implementation into a transcription rather than a design exercise.
-5. **Create the page as draft first.** `elementor-mcp-create-page` with `status: "draft"`. Pick the right page template (see [Page template choice](#page-template-choice)). **After creating any page you intend to build with Elementor, immediately set `_elementor_edit_mode` to `builder`** — otherwise the page renders with the block editor and your Elementor content is invisible: `wp post meta update <id> _elementor_edit_mode builder`.
+5. **Create the page as draft first.** `emcp-tools-create-page` with `status: "draft"`. Pick the right page template (see [Page template choice](#page-template-choice)). v3 sets `_elementor_edit_mode: builder` automatically and returns `edit_url`/`preview_url` in the response. (Legacy plugins don't set it — see the legacy deltas above.)
 6. **Build sections incrementally.** Container → its children → next container. Don't try to one-shot the whole page through `build-page` — small steps make iteration cheap. **Set `_title` on every top-level section container** at creation time (e.g. `"_title": "Hero — Section"`). It costs nothing — just another key in the `add-container` call — and turns the Elementor Navigator from an unlabeled "Container / Container / Container" list into a readable page map.
 7. **Publish, then visual review.** Use `agent-browser` (see [Visual review](#visual-review-with-agent-browser)). Compare against the source for both rendering glitches AND content fidelity. Iterate per-section using `update-element`, `update-container`, or `add-custom-css`.
 
-## The two-step widget pattern
+## Adding widgets — the catalog flow
 
-This is the single most important pattern in the skill. Internalize it.
+v3 replaced the old per-widget `add-*` tools with a three-step catalog: **discover → inspect → act.**
 
-**`add-<widget>` for content. `update-element` for styling.**
+1. **`list-widgets`** — the full widget catalog, filterable by `tier` (free/pro), `category`, and `search`.
+2. **`get-widget-schema`** — a widget type's curated params, **including the full styling surface** (`title_color`, `align`, the `typography_*` family, etc.). `types: [...]` batches several widgets in one call; `full: true` returns the raw control schema when a key isn't in the curated set.
+3. **`add-free-widget`** — or `add-pro-widget` for Pro widgets (disabled by default, see [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default)) — with `widget_type` plus settings. **Any valid Elementor control passes through at add time**, so content and styling land in one call.
 
-The `add-*` tool validators are strict — they accept only a widget's core content keys and reject most styling args. For example, `add-heading` rejects `title_color`; `add-image` rejects `width`. The tool descriptions list those keys because the widget really does accept them, but they live in conditional sub-control groups that the `add-*` schema validator doesn't expose.
-
-`update-element` does a partial merge into the element's settings without the strict validator and accepts the full long-tail control surface.
-
-**Example — accent-blue centered H2 heading:**
+**Example — accent-blue centered H2 heading, one call:**
 
 ```
-# Step 1: add the widget with content only
-add-heading(post_id=1537, parent_id="abc123", title="The Next Evolution", header_size="h2")
-→ returns element_id "64bfc7a"
-
-# Step 2: apply the styling via update-element
-update-element(post_id=1537, element_id="64bfc7a", settings={
+add-free-widget(post_id=1537, parent_id="abc123", widget_type="heading", settings={
+  "title": "The Next Evolution",
+  "header_size": "h2",
   "align": "center",
   "title_color": "#366FFE",
   "typography_typography": "custom",
@@ -92,17 +112,22 @@ update-element(post_id=1537, element_id="64bfc7a", settings={
   "typography_line_height": {"unit": "em", "size": 1.15, "sizes": []},
   "_margin": {"top": "24", "right": "0", "bottom": "16", "left": "0", "unit": "px", "isLinked": false}
 })
+→ returns element_id "64bfc7a"
 ```
 
-Don't waste calls trying styling args inside `add-*` and recovering from rejections. Go straight to `update-element` after the add. This applies to every widget type.
+For iteration after the add, `update-element` is the universal workhorse: a partial merge into any element's settings (widgets AND containers), accepting the full long-tail control surface. `update-widget` (new in v3) is identical but widgets-only — it errors helpfully if the ID turns out to be a container; either is fine for widgets.
 
-**Why this matters:** styling stored in element settings shows up in the Elementor Style tab and is editable from the panel UI. Styling stored in Custom CSS blocks is not. The user shouldn't have to dig into code to change a color.
+**The discipline that matters is schema-first, because nothing validates key names.** `add-free-widget` and `update-element` silently store any key you invent — a typo'd or guessed key is accepted and does nothing. Check `get-widget-schema` (or `get-element-settings` on a known-good element) before writing keys you haven't used before.
+
+**Don't confuse the atomic family with classic widgets.** `add-atomic-heading`, the other `add-atomic-*` tools, `add-div-block`, and `add-flexbox` target Elementor v4 *atomic* widgets — a different element system. For standard Elementor / Elementor Pro builds, `add-free-widget` / `add-pro-widget` + `add-container` are the right tools.
+
+**Why native settings matter:** styling stored in element settings shows up in the Elementor Style tab and is editable from the panel UI. Styling stored in Custom CSS blocks is not. The user shouldn't have to dig into code to change a color.
 
 ## Choosing widgets — favor native over HTML
 
-HTML widgets defeat Elementor's value proposition. Once content is in `add-html`, the editor user can't drag, recolor, or reorder pieces from the panel — they're stuck with raw markup.
+HTML widgets defeat Elementor's value proposition. Once content is in an `html` widget, the editor user can't drag, recolor, or reorder pieces from the panel — they're stuck with raw markup.
 
-Use the table below to pick the right widget. Reach for `add-html` only when the design truly needs markup with no native equivalent (embeds, specific semantic HTML, etc.).
+Use the table below to pick the right widget. Reach for the `html` widget only when the design truly needs markup with no native equivalent (embeds, specific semantic HTML, etc.).
 
 | Design pattern | Native expression |
 |---|---|
@@ -120,7 +145,7 @@ Use the table below to pick the right widget. Reach for `add-html` only when the
 
 ## Container gap — use `flex_gap`, not `gap`
 
-When setting the spacing between a container's flex children, always use `flex_gap` in `update-element` calls — not `gap`. Elementor's CSS generator reads `flex_gap` to emit `--widgets-spacing-row` / `--widgets-spacing-column`. The `gap` key is accepted and stored in the element data, but it does not drive CSS output and will appear to have no effect on the frontend.
+When setting the spacing between a container's flex children, always use `flex_gap` in `update-element` calls — not `gap`. Elementor's CSS generator reads `flex_gap` to emit the container's gap CSS vars (`--gap` / `--row-gap` on Elementor 4.x; `--widgets-spacing-row/column` on older versions — the kit default flows through `--widgets-spacing`). The `gap` key is accepted and stored in the element data, but it does not drive CSS output and will appear to have no effect on the frontend.
 
 ```
 # Wrong — stored but ignored by CSS generator:
@@ -220,7 +245,8 @@ add-container(parent_id="<parent>", settings={
 
 ```bash
 agent-browser eval "
-const g = document.querySelector('.elementor-element-<element_id>');
+const el = document.querySelector('.elementor-element-<element_id>');
+const g = el.querySelector(':scope > .e-con-inner') || el;   // boxed containers style the inner node
 const s = getComputedStyle(g);
 JSON.stringify({ cols: s.gridTemplateColumns, rows: s.gridTemplateRows, children: g.childElementCount })
 "
@@ -246,7 +272,7 @@ Symptom: a heading or text-editor inside a flex-column container appears horizon
 
 ## Custom CSS — fallback only
 
-`add-custom-css` is the escape hatch, not the workhorse. Use it only when the styling has no native control:
+`add-custom-css` is the escape hatch, not the workhorse. (It's also **disabled by default in v3.1** — see [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default).) Use it only when the styling has no native control:
 
 - `<strong>`, `<em>`, `<a>` styling inside heading/text content
 - `white-space: nowrap`
@@ -261,7 +287,7 @@ If a styling decision can plausibly be expressed via `title_color`, `text_color`
 
 ## Dynamic tags — outputting live data
 
-Use `elementor-mcp-set-dynamic-tag` whenever a widget field should output a computed or context-aware value rather than hardcoded text. This keeps content editable from the panel and avoids manual updates when data changes.
+Use `emcp-tools-set-dynamic-tag` whenever a widget field should output a computed or context-aware value rather than hardcoded text. This keeps content editable from the panel and avoids manual updates when data changes. Both `set-dynamic-tag` and `list-dynamic-tags` are **disabled by default in v3.1** — enable them first via [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default).
 
 ```
 set-dynamic-tag(post_id=<id>, element_id="<widget>",
@@ -276,12 +302,12 @@ set-dynamic-tag(post_id=<id>, element_id="<widget>",
 Use a `heading` widget with `header_size: "div"` (no semantic heading tag) and the `current-date-time` dynamic tag. The year auto-updates every year with zero maintenance, and all surrounding text stays panel-editable.
 
 ```
-# Step 1 — add the heading
-add-heading(post_id=<id>, parent_id="<footer-container>",
-  title="placeholder",
-  header_size="div",
-  align="center"
-)
+# Step 1 — add the heading (the styling below could ride along in this call too)
+add-free-widget(post_id=<id>, parent_id="<footer-container>", widget_type="heading", settings={
+  "title": "placeholder",
+  "header_size": "div",
+  "align": "center"
+})
 → element_id "abc1234"
 
 # Step 2 — style and set dynamic tag (run in parallel)
@@ -316,9 +342,11 @@ See the ACF dynamic tag anti-pattern row below for the correct `tag_name` (`"acf
 
 ## Kit-level CSS — safety rule and baseline check
 
-> ⚠️ **NEVER call `elementor-mcp-update-page-settings` on the kit post.** It does a **full replace** on the kit's `_elementor_page_settings` meta — colors, typography, globals, all wiped. The only safe path for any kit write is `wp eval` read-modify-write. **No exception.**
+> ⚠️ **NEVER call `emcp-tools-update-page-settings` on the kit post.** It does a **full replace** on the kit's `_elementor_page_settings` meta — colors, typography, globals, all wiped. The only safe generic kit write is `wp eval` read-modify-write. **No exception.**
 
-The kit ships with a small baseline of defensive CSS overrides (paragraph margin resets, focus-ring accessibility fix). Check for the `skill-baseline: applied` marker in `settings.custom_css` at workflow step 3. Full baseline rules, application recipe, corruption recovery, and opt-out flow: **[`references/kit-css.md`](references/kit-css.md)**.
+**One safe native path exists in v3 — for CUSTOM palette entries only.** `update-global-colors` and `update-global-typography` genuinely merge: a new item is appended to `custom_colors`/`custom_typography`, an existing custom `_id` is updated in place, and every other kit key is untouched (`update-global-typography` also auto-injects the required `typography_typography: "custom"`). **They cannot write the system slots:** passing `_id: "primary"` does NOT update `system_colors` — it appends a duplicate "Primary" entry into the custom palette, leaving two entries with colliding `_id`s and ambiguous `__globals__` resolution. System slots (Primary/Secondary/Text/Accent) still require the `wp eval` path.
+
+The kit ships with a small baseline of defensive CSS overrides (paragraph margin resets, focus-ring accessibility fix). Check for the `skill-baseline: applied` marker in `settings.custom_css` at workflow step 3 (the key may be absent on a fresh kit). Full baseline rules, application recipe, corruption recovery, and opt-out flow: **[`references/kit-css.md`](references/kit-css.md)**.
 
 ## Visual review with agent-browser
 
@@ -356,6 +384,8 @@ When a screenshot looks wrong, screenshots themselves don't tell you *which CSS 
 
 The **selector-match check** is the most important — never write a CSS rule to a kit's `custom_css` without confirming it matches at least one element on a real page. A `0` return on a page with the target widget type means the selector is wrong.
 
+**Measure the right node:** on `e-con-boxed` containers (Elementor 4.x), flex/grid/gap/align/padding land on the child `.e-con-inner`, NOT the outer `.elementor-element-<id>` node — reading the outer node reports `align-items: normal`, `row-gap: normal`, and wrong grid templates. Query `el.querySelector(':scope > .e-con-inner') || el` in every container eval.
+
 ## Page template choice
 
 | Use case | Setting |
@@ -364,7 +394,7 @@ The **selector-match check** is the most important — never write a CSS rule to
 | Full-width within site chrome | `template: "elementor_header_footer"` |
 | Content page integrated with site nav | omit or `template: "default"` |
 
-Set via `elementor-mcp-update-page-settings` after page creation. Use canvas for one-sheets, pitch decks, sales pages; default for content/blog pages.
+Set via `emcp-tools-update-page-settings` after page creation. Use canvas for one-sheets, pitch decks, sales pages; default for content/blog pages.
 
 ## Maintenance Mode / Coming Soon page
 
@@ -374,9 +404,9 @@ Elementor Pro's Maintenance Mode intercepts all front-end requests and serves a 
 
 ### Key facts
 
-**Wrong tool:** `elementor-mcp-create-page` → creates a `page` post type; won't appear in Elementor's template picker and causes PHP warnings in the maintenance mode render.
+**Wrong tool:** `emcp-tools-create-page` → creates a `page` post type; won't appear in Elementor's template picker and causes PHP warnings in the maintenance mode render.
 
-**Right tool:** `elementor-mcp-create-theme-template` with `template_type: "page"`. After creation:
+**Right tool:** `emcp-tools-create-theme-template` with `template_type: "page"` (**disabled by default in v3.1** — enable via [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default)). After creation:
 ```bash
 wp post meta update <id> _wp_page_template elementor_canvas
 wp post meta update <id> _elementor_edit_mode builder
@@ -407,7 +437,13 @@ Accent H1 (h2)         64bfc7a
 Subhead text-editor    f3eda9f
 ```
 
-If you lose an ID, recover it with `elementor-mcp-get-page-structure` or `elementor-mcp-find-element`.
+If you lose an ID, recover it with `emcp-tools-get-page-structure` or `emcp-tools-find-element`.
+
+## Element ops — batch, duplicate, move (v3)
+
+- **`batch-update`** — an array of `{element_id, settings}` merges applied in ONE save: one revision, one CSS regen, per-op failure reporting. Prefer it over looping `update-element` whenever you're styling more than one element.
+- **`duplicate-element`** — deep-copies an element (children included, fresh IDs), placed immediately after the original. Card grids: build ONE card completely, duplicate it N−1 times, then `batch-update` the texts.
+- **`move-element`** / **`reorder-elements`** — re-parent an element (`target_parent_id`; `""` for top level; `position: -1` appends) / reorder a container's children by passing the full ordered array of direct-child IDs. Restructure without rebuilding — see the HTML-refactoring recipe in [`references/layout-patterns.md`](references/layout-patterns.md).
 
 ## Form widget — native styling
 
@@ -426,7 +462,12 @@ Quick control map:
 
 | Anti-pattern | What to do instead |
 |---|---|
-| Falling back to `add-html` after one `add-*` styling rejection | Go straight to `update-element` with the styling keys |
+| Falling back to `add-html` because a styling key was rejected or seemed unsupported | In v3, `add-free-widget` passes any valid control through at add time; iterate with `update-element`. On legacy plugins, styling goes in a follow-up `update-element` after the `add-*` call. Never HTML. |
+| Treating a missing `emcp-tools-*` tool as a missing capability | Six skill-critical tools ship disabled by default in v3.1 (`add-custom-css`, `set-dynamic-tag`, `list-dynamic-tags`, `add-pro-widget`, `create-theme-template`, `set-template-conditions`). Check the `emcp_tools_disabled_tools` option — see [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default). |
+| Using `add-atomic-*` / `add-div-block` / `add-flexbox` for a classic widget build | Those target Elementor v4 *atomic* widgets — a different element system. Classic builds use `add-free-widget` / `add-pro-widget` + `add-container`. |
+| Looping `update-element` to style multiple elements | Use `batch-update` — all merges in one save: one revision, less CSS churn, per-op failure reporting. |
+| Writing a system color slot via `update-global-colors` | Passing a system `_id` (e.g. `"primary"`) appends a duplicate entry into `custom_colors` instead of updating `system_colors` — colliding `_id`s, ambiguous `__globals__` resolution. Custom palette entries: safe (it merges). System slots: `wp eval` read-modify-write only. |
+| Reading computed flex/grid/gap/padding from the outer `.elementor-element` node of a boxed container | Elementor 4.x applies them to the child `.e-con-inner`. Query `:scope > .e-con-inner` (falling back to the element itself for full-width containers), or every eval reports defaults. |
 | Skipping `get-global-settings` | Read the kit first; reference it via `__globals__` |
 | Defining brand colors per-element | Use `__globals__` references: `"title_color__globals__": "globals/colors?id=accent"` |
 | Re-uploading images already in Media Library | Check `wp media list` first |
@@ -437,7 +478,7 @@ Quick control map:
 | Treating `add-custom-css` as primary, `update-element` as fallback | Inverse: native first, CSS only when no native control exists |
 | Giving a flex child `_flex_grow: "1"` without setting `_flex_size: "none"` on its fixed sibling | Pair them — see "Flex sizing" above. Symptom: the fixed sibling visually disappears. |
 | Creating a flex-column container without explicit `flex_align_items` | Set `flex_align_items: "stretch"` explicitly — Elementor injects `"center"` otherwise, which silently breaks any `align: "left"` on child widgets. |
-| Calling `elementor-mcp-update-page-settings` on a kit post | NEVER. Full replace wipes entire brand kit. Use `wp eval` read-modify-write — see [`references/kit-css.md`](references/kit-css.md). |
+| Calling `emcp-tools-update-page-settings` on a kit post | NEVER. Full replace wipes entire brand kit. Custom palette entries: `update-global-colors`/`update-global-typography` (they merge). Everything else: `wp eval` read-modify-write — see [`references/kit-css.md`](references/kit-css.md). |
 | Setting custom typography/colors but skipping the system slots | Set both layers. System slots (Primary/Secondary/Text/Accent) still appear in every widget's picker — if left on Elementor defaults they show Roboto/`#6EC1E4`. See [`references/site-settings.md`](references/site-settings.md). |
 | Setting `_element_width` to `"custom"` when specifying custom widget widths | Always set `_element_width` to **`"initial"`** (the actual stored value for the "Custom" option in Elementor's data model) and define the size under `_element_custom_width`. Setting it to `"custom"` is written out literally and breaks the layout. |
 | Setting `grid_columns_grid` without `grid_rows_grid` | Always set both axes. Omitting `grid_rows_grid` defaults to 2 rows, leaving an empty second row. Run the post-build eval to confirm — screenshots cannot catch this. See [Grid containers](#grid-containers--always-set-both-axes-explicitly). |
@@ -451,7 +492,7 @@ Quick control map:
 | Setting container row/column gap via `gap` key | Use `flex_gap` instead — Elementor's CSS generator reads `flex_gap` to emit `--widgets-spacing-row/column`. The `gap` key is stored but silently ignored for CSS output. Symptom: spacing stays at the kit default (20px) no matter what value you write. |
 | Using `_padding` to set container padding | Use `padding` (no underscore). `_padding` is stored but silently ignored for rendered output — the container needs `--padding-top/bottom/left/right` CSS vars which only `padding` generates. See [Container padding](#container-padding--use-padding-not-_padding). |
 | Using an HTML widget for the copyright year line | Use a `heading` widget (tag `div`) with the `current-date-time` dynamic tag. Year auto-updates; text stays panel-editable. See [Dynamic tags](#dynamic-tags--outputting-live-data). |
-| Creating a Maintenance Mode template with `elementor-mcp-create-page` | Use `elementor-mcp-create-theme-template` — the template must be `post_type: elementor_library`. A regular `page` won't appear in Elementor's Maintenance Mode picker. See [`references/maintenance-mode.md`](references/maintenance-mode.md). |
+| Creating a Maintenance Mode template with `emcp-tools-create-page` | Use `emcp-tools-create-theme-template` (disabled by default in v3.1 — enable first) — the template must be `post_type: elementor_library`. A regular `page` won't appear in Elementor's Maintenance Mode picker. See [`references/maintenance-mode.md`](references/maintenance-mode.md). |
 | Setting `field_border_color` on a form widget without setting `field_border_border` | Set `field_border_border: "solid"` in the same call. Elementor skips the border CSS entirely if the border type is unset — the color has no visible effect. |
 | Attempting to build a working atomic form (email/storage) via standalone atomic widgets | Atomic form widgets (`e-form-input`, `e-form-label`, etc.) are **purely presentational** — no submission handling, no actions. Their MCP schemas are completely empty. The only native path to atomic rendering with working submission is the "Use Atomic Form" panel toggle on the regular `form` widget, which is NOT accessible via MCP. Use the regular `form` widget for all production forms. See [`references/form-widget.md`](references/form-widget.md#atomic-forms--definitive-findings-do-not-retry-without-new-information). |
 | A flex grow-child wrapping to the next row instead of sharing the row | Elementor's default gives flex children `flex-shrink: 0; flex-basis: auto`, so `_flex_size: "grow"` alone doesn't help. Add element-level custom CSS: `selector { flex: 1 1 0% !important; min-width: 0; }` to force correct shrink/basis behavior. |
@@ -466,23 +507,30 @@ Quick control map:
 
 | Purpose | Tool |
 |---|---|
-| Read brand kit | `elementor-mcp-get-global-settings` |
-| Create standard page | `elementor-mcp-create-page` |
-| Create Elementor library template (maintenance mode, theme parts) | `elementor-mcp-create-theme-template` |
-| Set page template / page-level options | `elementor-mcp-update-page-settings` |
-| Assign a dynamic tag to a widget field | `elementor-mcp-set-dynamic-tag` |
-| Add container | `elementor-mcp-add-container` |
-| Update container | `elementor-mcp-update-container` |
-| Get widget's accepted schema | `elementor-mcp-get-widget-schema` |
-| Get element's current settings | `elementor-mcp-get-element-settings` |
-| See page tree | `elementor-mcp-get-page-structure` |
-| Find elements by criteria | `elementor-mcp-find-element` |
-| Add widget (heading/image/text-editor/button/icon-box/icon-list/divider/html/etc.) | `elementor-mcp-add-<widget>` |
-| Apply styling to any element | `elementor-mcp-update-element` ⭐ |
-| Remove element | `elementor-mcp-remove-element` |
-| Per-element or page-level custom CSS | `elementor-mcp-add-custom-css` (use `replace: true` to overwrite) |
-| Upload SVG icon for icon widgets | `elementor-mcp-upload-svg-icon` |
-| Build complete page from declarative spec | `elementor-mcp-build-page` (powerful but hard to iterate) |
-| Style a Pro form widget (labels, fields, borders, button) | `elementor-mcp-update-element` with native form controls — see [`references/form-widget.md`](references/form-widget.md) |
+| Read brand kit | `emcp-tools-get-global-settings` |
+| Add/update CUSTOM palette entries (merges; NOT system slots) | `emcp-tools-update-global-colors` / `emcp-tools-update-global-typography` |
+| Create standard page (sets `_elementor_edit_mode` itself) | `emcp-tools-create-page` |
+| Create Elementor library template (maintenance mode, theme parts) | `emcp-tools-create-theme-template` † |
+| Set page template / page-level options | `emcp-tools-update-page-settings` |
+| Assign a dynamic tag to a widget field | `emcp-tools-set-dynamic-tag` † (discover tags with `emcp-tools-list-dynamic-tags` †) |
+| Add container | `emcp-tools-add-container` |
+| Update container | `emcp-tools-update-container` |
+| Browse the widget catalog (tier/category/search filters) | `emcp-tools-list-widgets` |
+| Get widget's accepted schema (curated; `types: []` batch; `full: true`) | `emcp-tools-get-widget-schema` |
+| Get element's current settings | `emcp-tools-get-element-settings` |
+| See page tree | `emcp-tools-get-page-structure` |
+| Find elements by criteria | `emcp-tools-find-element` |
+| Add any free widget — content + styling in one call | `emcp-tools-add-free-widget` (`widget_type` + settings) |
+| Add a Pro widget (form, posts, …) | `emcp-tools-add-pro-widget` † |
+| Apply styling to any element | `emcp-tools-update-element` ⭐ (widgets-only alias: `emcp-tools-update-widget`) |
+| Style many elements in one save | `emcp-tools-batch-update` |
+| Duplicate an element incl. children | `emcp-tools-duplicate-element` |
+| Re-parent / reorder elements | `emcp-tools-move-element` / `emcp-tools-reorder-elements` |
+| Remove element | `emcp-tools-remove-element` |
+| Per-element or page-level custom CSS | `emcp-tools-add-custom-css` † (use `replace: true` to overwrite) |
+| Upload SVG icon for icon widgets | `emcp-tools-upload-svg-icon` |
+| Build complete page from declarative spec | `emcp-tools-build-page` (powerful but hard to iterate) |
+| Style a Pro form widget (labels, fields, borders, button) | `emcp-tools-update-element` with native form controls — see [`references/form-widget.md`](references/form-widget.md) |
 
+† = disabled by default in v3.1 — see [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default).
 ⭐ = the workhorse tool. If you're not calling `update-element` more than `add-custom-css`, you're probably still in HTML-widget muscle memory.

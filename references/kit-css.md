@@ -43,7 +43,7 @@ If the count is 0 on a page that clearly has text-editor widgets, the selector i
 
 ## The workflow step-3 check
 
-On your first interaction with an Elementor site, after `get-global-settings`, look at `settings.custom_css`. Decide whether to propose the baseline:
+On your first interaction with an Elementor site, after `get-global-settings`, look at `settings.custom_css`. **The key may be absent entirely on a fresh kit — treat a missing key exactly like an empty string** (i.e., proceed to propose the baseline). Decide whether to propose:
 
 1. **Opt-out marker present** — if `custom_css` contains the substring `skill-baseline: opt-out`, skip. The site owner explicitly declined.
 2. **Baseline marker present** — if `custom_css` contains the substring `skill-baseline: applied`, the rules are in place. Skip.
@@ -54,11 +54,20 @@ On your first interaction with an Elementor site, after `get-global-settings`, l
 
 ## Applying the baseline — the ONLY safe path is `wp eval`
 
-> ⚠️ **DO NOT use `elementor-mcp-update-page-settings` on the kit post.** This is the most dangerous trap in the entire skill. The MCP tool does a **full replace** on the kit's `_elementor_page_settings` meta, NOT a merge. If you pass `{"custom_css": "..."}` to the kit's post_id, it replaces the entire settings array with just that one key. Elementor falls back to its global defaults for everything else — colors revert to `#6EC1E4`/`#54595F`/`#7A7A7A`/`#61CE70`, typography reverts to Roboto, every per-heading color is lost, every `__globals__` reference disappears. The site's brand identity is wiped in a single call.
+> ⚠️ **DO NOT use `emcp-tools-update-page-settings` on the kit post.** This is the most dangerous trap in the entire skill. The MCP tool does a **full replace** on the kit's `_elementor_page_settings` meta, NOT a merge. If you pass `{"custom_css": "..."}` to the kit's post_id, it replaces the entire settings array with just that one key. Elementor falls back to its global defaults for everything else — colors revert to `#6EC1E4`/`#54595F`/`#7A7A7A`/`#61CE70`, typography reverts to Roboto, every per-heading color is lost, every `__globals__` reference disappears. The site's brand identity is wiped in a single call.
 >
 > This is the opposite of `update-element` (which DOES partial-merge). The behavior diverges specifically for kit posts.
 >
-> **The only safe path for any kit-level write is `wp eval` read-modify-write. There is no exception.**
+> **The only safe path for kit-level CSS (and any other generic kit write) is `wp eval` read-modify-write.** The single exception is custom palette entries — see below.
+
+### Custom palette entries — the one safe native path (v3)
+
+Verified against v3.1.0: `emcp-tools-update-global-colors` and `emcp-tools-update-global-typography` genuinely **merge**:
+
+- A new item is **appended** to `custom_colors` / `custom_typography`; an existing custom `_id` is **updated in place** (no duplicate). Every other kit key — system slots, per-tag typography, `__globals__` references, `custom_css` — is untouched.
+- `update-global-typography` auto-injects `typography_typography: "custom"` into the saved item (required for Elementor to honor the fonts) even when you don't pass it.
+
+**They cannot write system slots.** Passing a system `_id` (e.g. `"primary"`) does NOT update `system_colors` — it appends a duplicate "Primary" entry into `custom_colors`, leaving two entries with colliding `_id`s and ambiguous `__globals__` resolution. If that happens, remove the duplicate via `wp eval` read-modify-write. System slots (Primary/Secondary/Text/Accent, colors AND typography) always go through `wp eval`.
 
 ```bash
 KIT_ID=$(wp option get elementor_active_kit)

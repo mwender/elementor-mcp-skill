@@ -42,11 +42,11 @@ If safe-svg isn't installed at all, recommend installing it (`wp plugin install 
 
 If a section is built with HTML widgets and the user wants it refactored to native:
 
-1. Read the structure: `elementor-mcp-get-page-structure` for the layout, `elementor-mcp-get-element-settings` on the HTML widget to capture the content.
+1. Read the structure: `emcp-tools-get-page-structure` for the layout, `emcp-tools-get-element-settings` on the HTML widget to capture the content.
 2. Decompose the HTML widget's content into native widgets you'll place in the SAME parent container.
-3. `elementor-mcp-remove-element` the HTML widget.
-4. `add-*` each new native widget into the parent, capturing IDs.
-5. `update-element` each new widget for native styling.
+3. `emcp-tools-remove-element` the HTML widget.
+4. `add-free-widget` each new native widget into the parent — content AND styling in the same call — capturing IDs. If elements already exist elsewhere on the page, `move-element` / `reorder-elements` can re-parent and re-order instead of rebuilding, and `duplicate-element` clones a finished element (children included) for repeating structures.
+5. Iterate styling with `batch-update` (one save for all corrections) or per-element `update-element`.
 6. Visual-review the section; iterate.
 
 This preserves the parent container's styling (background, padding, layout) and only swaps the content.

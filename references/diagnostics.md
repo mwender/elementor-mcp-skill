@@ -2,6 +2,18 @@
 
 When a screenshot suggests something's wrong, screenshots themselves are a poor diagnostic tool — they tell you "this looks gray" but not *which CSS rule* is making it gray. The recipes below use `agent-browser eval` to ask the browser what it's actually computing. Use them aggressively. They turn a half-hour "why is this broken" investigation into a 30-second answer.
 
+## Rule zero: measure the right node on containers
+
+On `e-con-boxed` containers (Elementor 4.x), the flex/grid/gap/align/padding styles land on the child `.e-con-inner` node, NOT the outer `.elementor-element-<id>` node. Reading `getComputedStyle` on the outer element reports `align-items: normal`, `row-gap: normal`, and wrong grid templates — a false "the setting didn't take" signal. Full-width containers have no `.e-con-inner`, so always use the fallback pattern:
+
+```js
+const el = document.querySelector('.elementor-element-<id>');
+const target = el.querySelector(':scope > .e-con-inner') || el;
+getComputedStyle(target)...
+```
+
+Related version note: Elementor 4.x emits container gap as `--gap` / `--row-gap` (kit default flows through `--widgets-spacing`); older versions used `--widgets-spacing-row/column`. The `flex_gap`-not-`gap` rule in SKILL.md is unaffected — only the variable names differ when you're inspecting.
+
 ## Does my selector match anything?
 
 ```bash

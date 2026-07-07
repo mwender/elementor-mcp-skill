@@ -6,9 +6,9 @@ Elementor Pro's Maintenance Mode feature intercepts all front-end requests and s
 
 ## Post type: `elementor_library` — not `page`
 
-The template is an **Elementor library item**, not a standard WordPress page. Creating it as a regular page (`elementor-mcp-create-page`) will fail to appear in Elementor's Maintenance Mode template picker and may cause PHP warnings during the maintenance mode render.
+The template is an **Elementor library item**, not a standard WordPress page. Creating it as a regular page (`emcp-tools-create-page`) will fail to appear in Elementor's Maintenance Mode template picker and may cause PHP warnings during the maintenance mode render.
 
-**Correct tool:** `elementor-mcp-create-theme-template` with `template_type: "page"`
+**Correct tool:** `emcp-tools-create-theme-template` with `template_type: "page"` — note it is **disabled by default in v3.1**; enable it first via the tool gate (see SKILL.md "The v3 tool gate")
 
 After creation, set the page template to canvas via WP-CLI:
 ```bash
@@ -110,7 +110,7 @@ You don't need to construct this string manually — `set-dynamic-tag` handles e
 
 ## Complete Maintenance Mode page build checklist
 
-1. `elementor-mcp-create-theme-template` → note the post ID
+1. `emcp-tools-create-theme-template` → note the post ID
 2. `wp post meta update <id> _wp_page_template elementor_canvas`
 3. `wp post meta update <id> _elementor_edit_mode builder`
 4. Build the page content (canvas template, full-viewport layout)

@@ -1,5 +1,7 @@
 # Elementor Pro Form Widget — Styling & Patterns
 
+> **Adding the widget (v3):** the form widget is Pro, so it's placed with `emcp-tools-add-pro-widget` (`widget_type: "form"`) — which is **disabled by default in v3.1**; enable it via the tool gate (see SKILL.md "The v3 tool gate") before building forms. `add-custom-css` and `add-custom-js` (used further down) are also gated.
+
 ## Native style controls first, CSS last
 
 The form widget has a rich set of native style controls accessible via `update-element`. Use these before reaching for `add-custom-css`.
@@ -258,7 +260,7 @@ The `custom_id`-based DOM ID (`#form-field-phone`) is derived from `custom_id`, 
 })();
 ```
 
-Deliver via `elementor-mcp-add-custom-js` appended to the root page container (position `-1`). The script is page-scoped, outputs in the footer, and the DOM is already rendered when it runs.
+Deliver via `emcp-tools-add-custom-js` appended to the root page container (position `-1`). The script is page-scoped, outputs in the footer, and the DOM is already rendered when it runs.
 
 | Setting | Value | Reason |
 |---|---|---|
