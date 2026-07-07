@@ -287,7 +287,7 @@ If a styling decision can plausibly be expressed via `title_color`, `text_color`
 
 ## Dynamic tags — outputting live data
 
-Use `emcp-tools-set-dynamic-tag` whenever a widget field should output a computed or context-aware value rather than hardcoded text. This keeps content editable from the panel and avoids manual updates when data changes. Both `set-dynamic-tag` and `list-dynamic-tags` are **disabled by default in v3.1** — enable them first via [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default).
+Use `emcp-tools-set-dynamic-tag` whenever a widget field should output a computed or context-aware value rather than hardcoded text (copyright year, post title, ACF fields, …). This keeps content editable from the panel and avoids manual updates when data changes. Both `set-dynamic-tag` and `list-dynamic-tags` are **disabled by default in v3.1** — enable them first via [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default).
 
 ```
 set-dynamic-tag(post_id=<id>, element_id="<widget>",
@@ -297,48 +297,7 @@ set-dynamic-tag(post_id=<id>, element_id="<widget>",
 )
 ```
 
-### Copyright year — sitewide footer or any page footer
-
-Use a `heading` widget with `header_size: "div"` (no semantic heading tag) and the `current-date-time` dynamic tag. The year auto-updates every year with zero maintenance, and all surrounding text stays panel-editable.
-
-```
-# Step 1 — add the heading (the styling below could ride along in this call too)
-add-free-widget(post_id=<id>, parent_id="<footer-container>", widget_type="heading", settings={
-  "title": "placeholder",
-  "header_size": "div",
-  "align": "center"
-})
-→ element_id "abc1234"
-
-# Step 2 — style and set dynamic tag (run in parallel)
-update-element(post_id=<id>, element_id="abc1234", settings={
-  "typography_typography": "custom",
-  "typography_font_family": "Inter",
-  "typography_font_size": {"unit": "px", "size": 11, "sizes": []},
-  "typography_text_transform": "uppercase",
-  "typography_letter_spacing": {"unit": "em", "size": 0.14, "sizes": []},
-  "title_color": "rgba(255,255,255,0.2)"
-})
-
-set-dynamic-tag(post_id=<id>, element_id="abc1234",
-  setting_key="title",
-  tag_name="current-date-time",
-  tag_settings={
-    "date_format": "custom",
-    "custom_format": "Y",
-    "before": "© ",
-    "after": " [Site Name]. All rights reserved."
-  }
-)
-```
-
-Output: **© 2025 [Site Name]. All rights reserved.**
-
-Replace `[Site Name]` with the actual site name. The `before`/`after` fields wrap the dynamic year output with plain text; HTML entities like `&copy;` also work.
-
-### ACF field output
-
-See the ACF dynamic tag anti-pattern row below for the correct `tag_name` (`"acf-text"`) and `key` format (`"field_key:field_name"`).
+Full recipes — the copyright-year footer line (`current-date-time` + `before`/`after` wrapping on a `div`-tag heading) and ACF field output (`acf-text`, `"field_key:field_name"` key format): **[`references/dynamic-tags.md`](references/dynamic-tags.md)**.
 
 ## Kit-level CSS — safety rule and baseline check
 
@@ -398,31 +357,9 @@ Set via `emcp-tools-update-page-settings` after page creation. Use canvas for on
 
 ## Maintenance Mode / Coming Soon page
 
-Elementor Pro's Maintenance Mode intercepts all front-end requests and serves a single template. This is **not** a regular WordPress page — it's an `elementor_library` post.
+Elementor Pro's Maintenance Mode intercepts all front-end requests and serves a single template. This is **not** a regular WordPress page — it's an `elementor_library` post, so the **wrong tool is `emcp-tools-create-page`** (won't appear in the template picker; PHP warnings at render) and the **right tool is `emcp-tools-create-theme-template`** with `template_type: "page"` (**disabled by default in v3.1** — enable via [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default)).
 
-**Full setup reference:** [`references/maintenance-mode.md`](references/maintenance-mode.md)
-
-### Key facts
-
-**Wrong tool:** `emcp-tools-create-page` → creates a `page` post type; won't appear in Elementor's template picker and causes PHP warnings in the maintenance mode render.
-
-**Right tool:** `emcp-tools-create-theme-template` with `template_type: "page"` (**disabled by default in v3.1** — enable via [the tool gate](#the-v3-tool-gate--39-tools-ship-disabled-by-default)). After creation:
-```bash
-wp post meta update <id> _wp_page_template elementor_canvas
-wp post meta update <id> _elementor_edit_mode builder
-wp post update <id> --post_status=publish
-```
-
-**Activate maintenance mode** via three WP options:
-```bash
-wp option update elementor_maintenance_mode_mode        'coming_soon'   # or 'maintenance' for 503
-wp option update elementor_maintenance_mode_template_id '<post_id>'
-wp option update elementor_maintenance_mode_exclude_mode 'logged_in'    # logged-in users see the real site
-```
-
-**Deactivate** (without losing settings): `wp option update elementor_maintenance_mode_mode ''`
-
-For the footer copyright line on the maintenance page, use the `current-date-time` dynamic tag — see [Dynamic tags — outputting live data](#dynamic-tags--outputting-live-data).
+Post-creation meta commands, the three `elementor_maintenance_mode_*` activation options, and the deactivate-without-losing-settings flow: **[`references/maintenance-mode.md`](references/maintenance-mode.md)**. For the footer copyright line, use the `current-date-time` dynamic tag — see [Dynamic tags](#dynamic-tags--outputting-live-data).
 
 ## Element ID tracking
 
@@ -483,7 +420,7 @@ Quick control map:
 | Setting `_element_width` to `"custom"` when specifying custom widget widths | Always set `_element_width` to **`"initial"`** (the actual stored value for the "Custom" option in Elementor's data model) and define the size under `_element_custom_width`. Setting it to `"custom"` is written out literally and breaks the layout. |
 | Setting `grid_columns_grid` without `grid_rows_grid` | Always set both axes. Omitting `grid_rows_grid` defaults to 2 rows, leaving an empty second row. Run the post-build eval to confirm — screenshots cannot catch this. See [Grid containers](#grid-containers--always-set-both-axes-explicitly). |
 | Omitting `_title` on top-level section containers | Set `_title` at creation time (e.g. `"_title": "Hero — Section"`). Costs nothing; makes the Elementor Navigator a readable page map instead of "Container / Container / Container." Inner containers and widgets don't need it. |
-| Wrong tag name or key format for ACF dynamic tags | Use `tag_name: "acf-text"` (not `"acf"`). The `key` setting must be `"field_key:field_name"` (colon-separated, e.g. `"field_page_eyebrow:page_eyebrow"`). Passing only the field key causes a PHP warning and the field still renders, but passing only the field name silently fails. Use `list-dynamic-tags` to confirm available tag names for the active ACF version. |
+| Wrong tag name or key format for ACF dynamic tags | Use `tag_name: "acf-text"` (not `"acf"`). The `key` setting must be `"field_key:field_name"` (colon-separated, e.g. `"field_page_eyebrow:page_eyebrow"`). Passing only the field key causes a PHP warning and the field still renders, but passing only the field name silently fails. Use `list-dynamic-tags` to confirm available tag names for the active ACF version. See [`references/dynamic-tags.md`](references/dynamic-tags.md). |
 | Assuming a user-edited element's structure from memory or conversation summaries | Call `get-page-structure` + `get-element-settings` on the reference element *before* building anything meant to match it. User hands-on edits introduce nesting depth, sub-container order, and setting details that no summary fully captures. The API is ground truth; summaries are hints. |
 | Assuming a common UI control name maps directly to its Elementor setting key | Elementor uses namespaced/prefixed keys that differ from the panel label. `width` (a panel concept) is `_element_width` + `_element_custom_width`; flex grow is `_flex_size: "grow"` + `_flex_grow: "1"`; background type is `background_background` (value: `"classic"` or `"gradient"`). The `_` prefix applies to specific families (widget sizing, flex) — it is NOT a universal prefix. Never guess key names from the UI label. Always use `get-element-settings` on a known-good element or `get-widget-schema` to discover the real key names before writing. Guessing common names is silently accepted and silently does nothing. |
 | Setting a heading font-weight of 300 while expecting `<strong>` children to appear bold | Hello Elementor theme sets `strong { font-weight: bolder }`. With a parent at weight 300, `bolder` computes to 400, not 700. Any heading with `typography_font_weight: "300"` that contains bold `<strong>` child text needs: `add-custom-css(element_id=<heading>, css="selector strong { font-weight: 700; }")`. |
@@ -491,7 +428,7 @@ Quick control map:
 | Adding Custom CSS for a property without first checking whether a native Elementor control already covers it | Duplicate styling creates specificity conflicts — the CSS and native control fight and the result is unpredictable. Before writing any `add-custom-css`, call `get-element-settings` on the target element. If a native key already exists for the property (padding, border, background, typography, etc.), update it via `update-element` instead. |
 | Setting container row/column gap via `gap` key | Use `flex_gap` instead — Elementor's CSS generator reads `flex_gap` to emit `--widgets-spacing-row/column`. The `gap` key is stored but silently ignored for CSS output. Symptom: spacing stays at the kit default (20px) no matter what value you write. |
 | Using `_padding` to set container padding | Use `padding` (no underscore). `_padding` is stored but silently ignored for rendered output — the container needs `--padding-top/bottom/left/right` CSS vars which only `padding` generates. See [Container padding](#container-padding--use-padding-not-_padding). |
-| Using an HTML widget for the copyright year line | Use a `heading` widget (tag `div`) with the `current-date-time` dynamic tag. Year auto-updates; text stays panel-editable. See [Dynamic tags](#dynamic-tags--outputting-live-data). |
+| Using an HTML widget for the copyright year line | Use a `heading` widget (tag `div`) with the `current-date-time` dynamic tag. Year auto-updates; text stays panel-editable. Recipe: [`references/dynamic-tags.md`](references/dynamic-tags.md). |
 | Creating a Maintenance Mode template with `emcp-tools-create-page` | Use `emcp-tools-create-theme-template` (disabled by default in v3.1 — enable first) — the template must be `post_type: elementor_library`. A regular `page` won't appear in Elementor's Maintenance Mode picker. See [`references/maintenance-mode.md`](references/maintenance-mode.md). |
 | Setting `field_border_color` on a form widget without setting `field_border_border` | Set `field_border_border: "solid"` in the same call. Elementor skips the border CSS entirely if the border type is unset — the color has no visible effect. |
 | Attempting to build a working atomic form (email/storage) via standalone atomic widgets | Atomic form widgets (`e-form-input`, `e-form-label`, etc.) are **purely presentational** — no submission handling, no actions. Their MCP schemas are completely empty. The only native path to atomic rendering with working submission is the "Use Atomic Form" panel toggle on the regular `form` widget, which is NOT accessible via MCP. Use the regular `form` widget for all production forms. See [`references/form-widget.md`](references/form-widget.md#atomic-forms--definitive-findings-do-not-retry-without-new-information). |

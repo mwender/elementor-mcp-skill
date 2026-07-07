@@ -50,12 +50,13 @@ Claude Code skills use a three-tier loading model. This skill is structured to m
 
 ```
 elementor-mcp/
-├── SKILL.md              # ~550 lines — core patterns, loaded into context when the skill triggers
+├── SKILL.md              # ~475 lines — core patterns, loaded into context when the skill triggers
 └── references/           # loaded on-demand, one Read call away
     ├── onboarding.md     # new-site setup (install, .mcp.json, tool gate, memory templates)
     ├── diagnostics.md    # visual-debugging eval recipes
     ├── kit-css.md        # kit baseline CSS + safe kit-write paths + corruption recovery
     ├── form-widget.md    # Pro form widget styling, webhooks, phone masking
+    ├── dynamic-tags.md   # copyright-year + ACF dynamic-tag recipes
     ├── layout-patterns.md, maintenance-mode.md, reference-site-analysis.md, site-settings.md
 ```
 
@@ -64,6 +65,8 @@ elementor-mcp/
 ## Background
 
 This skill was built while battle-testing the Elementor MCP during work on a real production website. Every pattern, anti-pattern, and recovery procedure documented here came from something that actually happened — a styling argument got rejected by a strict validator, a flex layout silently collapsed when child widths met a `content_width: "boxed"` default, the kit's brand colors were wiped by a tool call that should have been a merge but was actually a replace.
+
+The v3 (EMCP Tools) adaptation followed the same standard: every v3-specific claim was verified in a dedicated battle-test session against a live 3.1.0 site — the raw findings are preserved in [`docs/v3-test-findings.md`](docs/v3-test-findings.md).
 
 Capturing those lessons in a skill means future Claude sessions on Elementor sites don't have to re-learn them. The skill is deliberately opinionated — it pushes hard toward native Elementor widgets and against HTML-widget shortcuts, because the latter undermines the entire reason for using Elementor in the first place: leaving the resulting page editable from the panel UI by humans who don't (and shouldn't have to) read code.
 
